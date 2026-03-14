@@ -9,11 +9,40 @@ import { exerciseLabel } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { Input } from '@/components/ui/input'
-import { CheckCircle2, Circle } from 'lucide-react'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { CheckCircle2, Circle, Trophy } from 'lucide-react'
 
 type Props = {
   session: WorkoutSessionWithRoutine
   initialSets: WorkoutSetWithExercise[]
+}
+
+function formatDuration(startIso: string, endIso: string): string {
+  const ms = new Date(endIso).getTime() - new Date(startIso).getTime()
+  const totalMinutes = Math.round(ms / 60000)
+  if (totalMinutes < 60) return `${totalMinutes} min`
+  const h = Math.floor(totalMinutes / 60)
+  const m = totalMinutes % 60
+  return m > 0 ? `${h}h ${m}min` : `${h}h`
+}
+
+function formatDate(iso: string): string {
+  return new Date(iso + 'T00:00:00').toLocaleDateString('pt-BR', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  })
+}
+
+type Summary = {
+  setsCompleted: number
+  totalReps: number
+  duration: string
 }
 
 export default function WorkoutClient({ session, initialSets }: Props) {
@@ -21,6 +50,7 @@ export default function WorkoutClient({ session, initialSets }: Props) {
   const [sets, setSets] = useState<WorkoutSetWithExercise[]>(initialSets)
   const [overrides, setOverrides] = useState<Record<string, string>>({})
   const [finishing, setFinishing] = useState(false)
+  const [summary, setSummary] = useState<Summary | null>(null)
 
   async function completeSet(setId: string, targetReps: number) {
     const parsed = overrides[setId] ? parseInt(overrides[setId]) : targetReps
@@ -64,16 +94,23 @@ export default function WorkoutClient({ session, initialSets }: Props) {
 
   async function finishWorkout() {
     setFinishing(true)
+    const completedAt = new Date().toISOString()
     const { error } = await supabase
       .from('workout_sessions')
-      .update({ completed_at: new Date().toISOString() })
+      .update({ completed_at: completedAt })
       .eq('id', session.id)
     if (error) {
       setFinishing(false)
       toast.error('Não foi possível finalizar o treino. Tente novamente.')
       return
     }
-    router.push('/')
+    const completedSets = sets.filter((s) => s.completed)
+    setSummary({
+      setsCompleted: completedSets.length,
+      totalReps: completedSets.reduce((acc, s) => acc + (s.actual_reps ?? 0), 0),
+      duration: formatDuration(session.created_at, completedAt),
+    })
+    setFinishing(false)
   }
 
   const completedCount = sets.filter((s) => s.completed).length
@@ -88,127 +125,195 @@ export default function WorkoutClient({ session, initialSets }: Props) {
     return acc
   }, {})
 
+  const exerciseGroups = Object.values(grouped)
+  const totalExercises = exerciseGroups.length
+  const totalPlannedSets = sets.length
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="space-y-3">
-        <div>
-          <p className="text-xs font-semibold text-primary uppercase tracking-widest mb-1">Treino em andamento</p>
-          <h1 className="text-3xl font-bold tracking-tight">{session.routines?.name}</h1>
-        </div>
-        <div className="space-y-1.5">
-          <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Progresso</span>
-            <span className="font-semibold tabular-nums">{completedCount} / {totalCount} séries</span>
+    <>
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="space-y-3">
+          <div>
+            <p className="text-xs font-semibold text-primary uppercase tracking-widest mb-1">
+              Treino em andamento
+            </p>
+            <h1 className="text-3xl font-bold tracking-tight">{session.routines?.name}</h1>
+            <p className="text-sm text-muted-foreground mt-1 capitalize">
+              {formatDate(session.date)} · {totalExercises} exercício{totalExercises !== 1 ? 's' : ''} · {totalPlannedSets} série{totalPlannedSets !== 1 ? 's' : ''}
+            </p>
           </div>
-          <Progress value={progress} className="h-2.5" />
-        </div>
-      </div>
-
-      {/* Exercise groups */}
-      {Object.values(grouped).map((exerciseSets) => {
-        const exercise = exerciseSets[0].routine_exercises.exercises
-        const groupDone = exerciseSets.every((s) => s.completed)
-        const label = exerciseLabel(exercise)
-        const [className, variant] = label.split(' — ')
-
-        return (
-          <div
-            key={exerciseSets[0].routine_exercise_id}
-            className={[
-              'rounded-xl border bg-card card-elevated overflow-hidden transition-all',
-              groupDone ? 'opacity-70' : '',
-            ].join(' ')}
-          >
-            {/* Exercise header */}
-            <div className={['px-4 py-3 border-b flex items-center justify-between', groupDone ? 'bg-muted/40' : 'bg-white'].join(' ')}>
-              <div>
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{className}</p>
-                <p className="font-semibold text-base">{variant ?? className}</p>
-              </div>
-              {groupDone && (
-                <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0" />
-              )}
+          <div className="space-y-1.5">
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Progresso</span>
+              <span className="font-semibold tabular-nums">{completedCount} / {totalCount} séries</span>
             </div>
+            <Progress value={progress} className="h-2.5" />
+          </div>
+        </div>
 
-            {/* Set rows */}
-            <div className="divide-y divide-border">
-              {exerciseSets.map((set) => (
-                <div
-                  key={set.id}
+        {/* Exercise preview strip */}
+        {exerciseGroups.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {exerciseGroups.map((exerciseSets) => {
+              const exercise = exerciseSets[0].routine_exercises.exercises
+              const label = exerciseLabel(exercise)
+              const [, variant] = label.split(' — ')
+              const done = exerciseSets.every((s) => s.completed)
+              return (
+                <span
+                  key={exerciseSets[0].routine_exercise_id}
                   className={[
-                    'flex items-center gap-3 px-4 py-3 transition-colors',
-                    set.completed ? 'bg-muted/20' : 'bg-white',
+                    'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium border transition-colors',
+                    done
+                      ? 'bg-green-50 text-green-700 border-green-200'
+                      : 'bg-muted/50 text-muted-foreground border-transparent',
                   ].join(' ')}
                 >
-                  {set.completed
-                    ? <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0" />
-                    : <Circle className="w-5 h-5 text-muted-foreground/40 shrink-0" />
-                  }
-
-                  <span className={['text-sm font-medium w-14 shrink-0', set.completed ? 'text-muted-foreground' : ''].join(' ')}>
-                    Série {set.set_number}
-                  </span>
-
-                  <Input
-                    type="number"
-                    placeholder={String(set.target_reps)}
-                    value={overrides[set.id] ?? (set.actual_reps != null ? String(set.actual_reps) : '')}
-                    onChange={(e) => {
-                      const val = e.target.value
-                      if (val === '' || parseInt(val) >= 1) {
-                        setOverrides((prev) => ({ ...prev, [set.id]: val }))
-                      }
-                    }}
-                    disabled={set.completed}
-                    className={[
-                      'w-16 h-9 text-center font-semibold tabular-nums shrink-0',
-                      set.completed ? 'text-muted-foreground line-through' : '',
-                    ].join(' ')}
-                  />
-
-                  <span className="text-sm text-muted-foreground shrink-0">reps</span>
-
-                  <div className="ml-auto">
-                    {set.completed ? (
-                      <button
-                        onClick={() => undoSet(set.id)}
-                        className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 transition-colors"
-                      >
-                        Desfazer
-                      </button>
-                    ) : (
-                      <Button
-                        size="sm"
-                        className="h-9 px-5 bg-green-600 hover:bg-green-700 text-white font-semibold"
-                        onClick={() => completeSet(set.id, set.target_reps)}
-                      >
-                        Feito
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
+                  {done && <CheckCircle2 className="w-3 h-3" />}
+                  {variant}
+                </span>
+              )
+            })}
           </div>
-        )
-      })}
+        )}
 
-      {/* Finish button */}
-      {totalCount > 0 && (
-        <Button
-          className={[
-            'w-full h-12 text-base font-semibold rounded-xl transition-all',
-            allDone
-              ? 'bg-primary hover:bg-primary/90 text-white shadow-md'
-              : 'bg-muted text-muted-foreground hover:bg-muted/80',
-          ].join(' ')}
-          onClick={finishWorkout}
-          disabled={finishing}
-        >
-          {finishing ? 'Finalizando…' : allDone ? '🎉 Finalizar treino' : 'Finalizar treino'}
-        </Button>
-      )}
-    </div>
+        {/* Exercise groups */}
+        {exerciseGroups.map((exerciseSets) => {
+          const exercise = exerciseSets[0].routine_exercises.exercises
+          const groupDone = exerciseSets.every((s) => s.completed)
+          const label = exerciseLabel(exercise)
+          const [className, variant] = label.split(' — ')
+
+          return (
+            <div
+              key={exerciseSets[0].routine_exercise_id}
+              className={[
+                'rounded-xl border bg-card card-elevated overflow-hidden transition-all',
+                groupDone ? 'opacity-70' : '',
+              ].join(' ')}
+            >
+              <div className={['px-4 py-3 border-b flex items-center justify-between', groupDone ? 'bg-muted/40' : 'bg-white'].join(' ')}>
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{className}</p>
+                  <p className="font-semibold text-base">{variant ?? className}</p>
+                </div>
+                {groupDone && <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0" />}
+              </div>
+
+              <div className="divide-y divide-border">
+                {exerciseSets.map((set) => (
+                  <div
+                    key={set.id}
+                    className={[
+                      'flex items-center gap-3 px-4 py-3 transition-colors',
+                      set.completed ? 'bg-muted/20' : 'bg-white',
+                    ].join(' ')}
+                  >
+                    {set.completed
+                      ? <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0" />
+                      : <Circle className="w-5 h-5 text-muted-foreground/40 shrink-0" />
+                    }
+
+                    <span className={['text-sm font-medium w-14 shrink-0', set.completed ? 'text-muted-foreground' : ''].join(' ')}>
+                      Série {set.set_number}
+                    </span>
+
+                    <Input
+                      type="number"
+                      placeholder={String(set.target_reps)}
+                      value={overrides[set.id] ?? (set.actual_reps != null ? String(set.actual_reps) : '')}
+                      onChange={(e) => {
+                        const val = e.target.value
+                        if (val === '' || parseInt(val) >= 1) {
+                          setOverrides((prev) => ({ ...prev, [set.id]: val }))
+                        }
+                      }}
+                      disabled={set.completed}
+                      className={[
+                        'w-16 h-9 text-center font-semibold tabular-nums shrink-0',
+                        set.completed ? 'text-muted-foreground line-through' : '',
+                      ].join(' ')}
+                    />
+
+                    <span className="text-sm text-muted-foreground shrink-0">reps</span>
+
+                    <div className="ml-auto">
+                      {set.completed ? (
+                        <button
+                          onClick={() => undoSet(set.id)}
+                          className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 transition-colors"
+                        >
+                          Desfazer
+                        </button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          className="h-9 px-5 bg-green-600 hover:bg-green-700 text-white font-semibold"
+                          onClick={() => completeSet(set.id, set.target_reps)}
+                        >
+                          Feito
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )
+        })}
+
+        {/* Finish button */}
+        {totalCount > 0 && (
+          <Button
+            className={[
+              'w-full h-12 text-base font-semibold rounded-xl transition-all',
+              allDone
+                ? 'bg-primary hover:bg-primary/90 text-white shadow-md'
+                : 'bg-muted text-muted-foreground hover:bg-muted/80',
+            ].join(' ')}
+            onClick={finishWorkout}
+            disabled={finishing}
+          >
+            {finishing ? 'Finalizando…' : 'Finalizar treino'}
+          </Button>
+        )}
+      </div>
+
+      {/* Completion summary dialog */}
+      <Dialog open={summary !== null} onOpenChange={(open) => { if (!open) router.push('/') }}>
+        <DialogContent className="max-w-sm text-center">
+          <DialogHeader>
+            <div className="flex justify-center mb-2">
+              <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center">
+                <Trophy className="w-7 h-7 text-primary" />
+              </div>
+            </div>
+            <DialogTitle className="text-2xl">Treino concluído!</DialogTitle>
+          </DialogHeader>
+
+          {summary && (
+            <div className="grid grid-cols-3 gap-3 mt-2">
+              <div className="rounded-xl border bg-muted/40 px-3 py-4">
+                <p className="text-2xl font-bold tabular-nums">{summary.setsCompleted}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">séries</p>
+              </div>
+              <div className="rounded-xl border bg-muted/40 px-3 py-4">
+                <p className="text-2xl font-bold tabular-nums">{summary.totalReps}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">reps</p>
+              </div>
+              <div className="rounded-xl border bg-muted/40 px-3 py-4">
+                <p className="text-2xl font-bold tabular-nums">{summary.duration}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">duração</p>
+              </div>
+            </div>
+          )}
+
+          <Button className="w-full mt-2" onClick={() => router.push('/')}>
+            Voltar ao início
+          </Button>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
