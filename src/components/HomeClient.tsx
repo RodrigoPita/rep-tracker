@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import type { Routine, WorkoutSession } from '@/lib/types'
 import { Button } from '@/components/ui/button'
@@ -25,16 +26,27 @@ export default function HomeClient({ routines, activeSessions }: Props) {
       .select()
       .single()
 
-    if (error || !data) { setStarting(null); return }
+    if (error || !data) {
+      setStarting(null)
+      toast.error('Não foi possível iniciar o treino. Tente novamente.')
+      return
+    }
 
-    const { data: reData } = await supabase
+    const { data: reData, error: reError } = await supabase
       .from('routine_exercises')
       .select('*')
       .eq('routine_id', routineId)
       .order('display_order')
 
+    if (reError) {
+      await supabase.from('workout_sessions').delete().eq('id', data.id)
+      setStarting(null)
+      toast.error('Não foi possível carregar os exercícios do treino.')
+      return
+    }
+
     if (reData && reData.length > 0) {
-      await supabase.from('workout_sets').insert(
+      const { error: setsError } = await supabase.from('workout_sets').insert(
         reData.flatMap((re) =>
           Array.from({ length: re.sets }, (_, i) => ({
             session_id: data.id,
@@ -44,6 +56,12 @@ export default function HomeClient({ routines, activeSessions }: Props) {
           }))
         )
       )
+      if (setsError) {
+        await supabase.from('workout_sessions').delete().eq('id', data.id)
+        setStarting(null)
+        toast.error('Não foi possível criar as séries do treino.')
+        return
+      }
     }
     router.push(`/workout/${data.id}`)
   }

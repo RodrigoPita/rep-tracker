@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import type { Routine } from '@/lib/types'
 import { Button } from '@/components/ui/button'
@@ -14,8 +15,13 @@ export default function RoutinesClient({ routines: initial }: Props) {
   const [routines, setRoutines] = useState<Routine[]>(initial)
 
   async function deleteRoutine(id: string) {
+    const previous = routines
     setRoutines((prev) => prev.filter((r) => r.id !== id))
-    await supabase.from('routines').delete().eq('id', id)
+    const { error } = await supabase.from('routines').delete().eq('id', id)
+    if (error) {
+      setRoutines(previous)
+      toast.error('Não foi possível excluir o treino. Tente novamente.')
+    }
   }
 
   return (
