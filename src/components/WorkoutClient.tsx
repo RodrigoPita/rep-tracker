@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import type { WorkoutSetWithExercise, WorkoutSessionWithRoutine } from '@/lib/types'
 import { exerciseLabel } from '@/lib/types'
@@ -41,6 +42,7 @@ export default function WorkoutClient({ session, initialSets }: Props) {
           s.id === setId ? { ...s, completed: false, actual_reps: null, completed_at: null } : s
         )
       )
+      toast.error('Não foi possível registrar a série. Tente novamente.')
     }
   }
 
@@ -54,15 +56,23 @@ export default function WorkoutClient({ session, initialSets }: Props) {
       .from('workout_sets')
       .update({ completed: false, actual_reps: null, completed_at: null })
       .eq('id', setId)
-    if (error) setSets(initialSets)
+    if (error) {
+      setSets(initialSets)
+      toast.error('Não foi possível desfazer a série. Tente novamente.')
+    }
   }
 
   async function finishWorkout() {
     setFinishing(true)
-    await supabase
+    const { error } = await supabase
       .from('workout_sessions')
       .update({ completed_at: new Date().toISOString() })
       .eq('id', session.id)
+    if (error) {
+      setFinishing(false)
+      toast.error('Não foi possível finalizar o treino. Tente novamente.')
+      return
+    }
     router.push('/')
   }
 

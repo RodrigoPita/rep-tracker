@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import type { ExerciseWithClass } from '@/lib/types'
 import { exerciseLabel } from '@/lib/types'
@@ -86,15 +87,17 @@ export default function RoutineForm({ routineId, allExercises, initialData }: Pr
       .single()
     if (!classData) {
       const res = await supabase.from('exercise_classes').insert({ name: className }).select().single()
+      if (res.error) { toast.error('Não foi possível criar a classe de exercício.'); return }
       classData = res.data
     }
     if (!classData) return
 
-    const { data: exData } = await supabase
+    const { data: exData, error: exError } = await supabase
       .from('exercises')
       .insert({ class_id: classData.id, variant })
       .select('*, exercise_classes(*)')
       .single()
+    if (exError) { toast.error('Não foi possível criar o exercício.'); return }
     if (exData) {
       setExercises((prev) => [...prev, exData as ExerciseWithClass])
       addExercise(exData as ExerciseWithClass)
@@ -127,16 +130,20 @@ export default function RoutineForm({ routineId, allExercises, initialData }: Pr
 
     let rid = routineId
     if (rid) {
-      await supabase.from('routines').update({ name }).eq('id', rid)
+      const { error } = await supabase.from('routines').update({ name }).eq('id', rid)
+      if (error) { toast.error('Não foi possível atualizar o treino.'); setSaving(false); return }
     } else {
-      const { data } = await supabase.from('routines').insert({ name }).select().single()
+      const { data, error } = await supabase.from('routines').insert({ name }).select().single()
+      if (error) { toast.error('Não foi possível criar o treino.'); setSaving(false); return }
       rid = data?.id
     }
     if (!rid) { setSaving(false); return }
 
-    await supabase.from('routine_exercises').delete().eq('routine_id', rid)
+    const { error: deleteError } = await supabase.from('routine_exercises').delete().eq('routine_id', rid)
+    if (deleteError) { toast.error('Não foi possível salvar os exercícios.'); setSaving(false); return }
+
     if (rows.length > 0) {
-      await supabase.from('routine_exercises').insert(
+      const { error: insertError } = await supabase.from('routine_exercises').insert(
         rows.map((r, i) => ({
           routine_id: rid!,
           exercise_id: r.exercise_id,
@@ -145,6 +152,7 @@ export default function RoutineForm({ routineId, allExercises, initialData }: Pr
           display_order: i,
         }))
       )
+      if (insertError) { toast.error('Não foi possível salvar os exercícios.'); setSaving(false); return }
     }
 
     router.push('/routines')
