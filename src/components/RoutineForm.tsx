@@ -10,6 +10,24 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent } from '@/components/ui/card'
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+  arrayMove,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+import { GripVertical } from 'lucide-react'
 
 type RowDraft = {
   exercise_id: string
@@ -34,6 +52,102 @@ function normalize(str: string) {
   return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
 }
 
+type SortableRowProps = {
+  row: RowDraft
+  index: number
+  total: number
+  onUpdate: (index: number, field: 'sets' | 'target_reps', value: number) => void
+  onRemove: (index: number) => void
+  onMove: (index: number, direction: -1 | 1) => void
+}
+
+function SortableRow({ row, index, total, onUpdate, onRemove, onMove }: SortableRowProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: row.exercise_id,
+  })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 10 : undefined,
+  }
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      <Card>
+        <CardContent className="py-3 flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            className="text-muted-foreground/50 hover:text-muted-foreground cursor-grab active:cursor-grabbing shrink-0 touch-none"
+            aria-label="Arrastar para reordenar"
+            {...attributes}
+            {...listeners}
+          >
+            <GripVertical className="w-4 h-4" />
+          </button>
+
+          <span className="font-medium flex-1 min-w-0 truncate text-sm">{row.label}</span>
+
+          <div className="flex items-center gap-1 shrink-0">
+            <Input
+              type="number"
+              value={row.sets}
+              onChange={(e) => onUpdate(index, 'sets', parseInt(e.target.value) || 1)}
+              className="w-14 h-8 text-center"
+              min={1}
+            />
+            <span className="text-sm text-muted-foreground">séries</span>
+          </div>
+
+          <div className="flex items-center gap-1 shrink-0">
+            <Input
+              type="number"
+              value={row.target_reps}
+              onChange={(e) => onUpdate(index, 'target_reps', parseInt(e.target.value) || 1)}
+              className="w-14 h-8 text-center"
+              min={1}
+            />
+            <span className="text-sm text-muted-foreground">reps</span>
+          </div>
+
+          <div className="flex gap-1 shrink-0">
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-8 w-8 p-0"
+              onClick={() => onMove(index, -1)}
+              disabled={index === 0}
+              aria-label="Mover para cima"
+            >
+              ↑
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-8 w-8 p-0"
+              onClick={() => onMove(index, 1)}
+              disabled={index === total - 1}
+              aria-label="Mover para baixo"
+            >
+              ↓
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-8 w-8 p-0"
+              onClick={() => onRemove(index)}
+              aria-label="Remover exercício"
+            >
+              ✕
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
 export default function RoutineForm({ routineId, allExercises, initialData }: Props) {
   const router = useRouter()
   const [name, setName] = useState(initialData?.name ?? '')
@@ -41,6 +155,11 @@ export default function RoutineForm({ routineId, allExercises, initialData }: Pr
   const [exercises, setExercises] = useState<ExerciseWithClass[]>(allExercises)
   const [search, setSearch] = useState('')
   const [saving, setSaving] = useState(false)
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  )
 
   const filtered = exercises.filter((e) => {
     const q = normalize(search)
@@ -124,6 +243,16 @@ export default function RoutineForm({ routineId, allExercises, initialData }: Pr
     })
   }
 
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    setRows((prev) => {
+      const oldIndex = prev.findIndex((r) => r.exercise_id === active.id)
+      const newIndex = prev.findIndex((r) => r.exercise_id === over.id)
+      return arrayMove(prev, oldIndex, newIndex).map((r, i) => ({ ...r, display_order: i }))
+    })
+  }
+
   async function save() {
     if (!name.trim()) return
     setSaving(true)
@@ -175,38 +304,23 @@ export default function RoutineForm({ routineId, allExercises, initialData }: Pr
         {rows.length === 0 && (
           <p className="text-sm text-muted-foreground">Nenhum exercício adicionado.</p>
         )}
-        {rows.map((row, i) => (
-          <Card key={i}>
-            <CardContent className="py-3 flex items-center gap-2 flex-wrap">
-              <span className="font-medium flex-1 min-w-0 truncate text-sm">{row.label}</span>
-              <div className="flex items-center gap-1 shrink-0">
-                <Input
-                  type="number"
-                  value={row.sets}
-                  onChange={(e) => updateRow(i, 'sets', parseInt(e.target.value) || 1)}
-                  className="w-14 h-8 text-center"
-                  min={1}
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={rows.map((r) => r.exercise_id)} strategy={verticalListSortingStrategy}>
+            <div className="space-y-2">
+              {rows.map((row, i) => (
+                <SortableRow
+                  key={row.exercise_id}
+                  row={row}
+                  index={i}
+                  total={rows.length}
+                  onUpdate={updateRow}
+                  onRemove={removeRow}
+                  onMove={moveRow}
                 />
-                <span className="text-sm text-muted-foreground">séries</span>
-              </div>
-              <div className="flex items-center gap-1 shrink-0">
-                <Input
-                  type="number"
-                  value={row.target_reps}
-                  onChange={(e) => updateRow(i, 'target_reps', parseInt(e.target.value) || 1)}
-                  className="w-14 h-8 text-center"
-                  min={1}
-                />
-                <span className="text-sm text-muted-foreground">reps</span>
-              </div>
-              <div className="flex gap-1 shrink-0">
-                <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => moveRow(i, -1)} disabled={i === 0}>↑</Button>
-                <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => moveRow(i, 1)} disabled={i === rows.length - 1}>↓</Button>
-                <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => removeRow(i)}>✕</Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
       </div>
 
       <div className="space-y-2">
