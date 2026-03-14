@@ -1,0 +1,70 @@
+export type ExerciseClass = {
+  id: string
+  name: string
+  created_at: string
+}
+
+export type Exercise = {
+  id: string
+  class_id: string
+  variant: string
+  created_at: string
+}
+
+export type Routine = {
+  id: string
+  name: string
+  created_at: string
+}
+
+export type RoutineExercise = {
+  id: string
+  routine_id: string
+  exercise_id: string
+  sets: number
+  target_reps: number
+  display_order: number
+}
+
+export type WorkoutSession = {
+  id: string
+  routine_id: string
+  date: string
+  completed_at: string | null
+  created_at: string
+}
+
+export type WorkoutSet = {
+  id: string
+  session_id: string
+  routine_exercise_id: string
+  set_number: number
+  target_reps: number
+  actual_reps: number | null
+  completed: boolean
+  completed_at: string | null
+}
+
+// Joined types used in UI
+export type ExerciseWithClass = Exercise & {
+  exercise_classes: ExerciseClass
+}
+
+export type RoutineExerciseWithExercise = RoutineExercise & {
+  exercises: ExerciseWithClass
+}
+
+export type WorkoutSetWithExercise = WorkoutSet & {
+  routine_exercises: RoutineExercise & {
+    exercises: ExerciseWithClass
+  }
+}
+
+export type WorkoutSessionWithRoutine = WorkoutSession & {
+  routines: Routine
+}
+
+/** "Flexão — Diamante" */
+export function exerciseLabel(exercise: ExerciseWithClass): string {
+  return `${exercise.exercise_classes.name} — ${exercise.variant}`
+}
