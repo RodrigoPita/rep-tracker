@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import type { ExerciseWithClass, WorkoutSet } from '@/lib/types'
 import { exerciseLabel } from '@/lib/types'
@@ -58,11 +59,17 @@ export default function AnalyticsClient({ exercises, summary }: Props) {
 
       if (exerciseIds.length === 0) { setStats([]); setLoadingStats(false); return }
 
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('workout_sets')
         .select('*, routine_exercises(exercise_id), workout_sessions(date)')
         .in('routine_exercises.exercise_id', exerciseIds)
         .eq('completed', true)
+
+      if (error) {
+        toast.error('Não foi possível carregar os dados. Tente novamente.')
+        setLoadingStats(false)
+        return
+      }
 
       const sets: (WorkoutSet & {
         routine_exercises: { exercise_id: string }
