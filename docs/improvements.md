@@ -111,3 +111,19 @@
 | 10 | Mobile feel | High | Medium |
 | 11 | Auth + RLS | High | High |
 | 12 | Weight tracking | Medium | High |
+| 13 | README | Low | Low |
+
+---
+
+## 13. README
+
+Follow the style of [chord-recognition](https://github.com/RodrigoPita/chord-recognition) and [songbook-builder](https://github.com/RodrigoPita/songbook-builder):
+
+- Title + emoji
+- Tech stack badges (shields.io) — Next.js, TypeScript, Supabase, Tailwind, Vercel
+- Short description
+- Features section with emoji bullets
+- Tech Stack section
+- Running Locally (prerequisites, clone, install, env vars, migrate, dev)
+- Project structure
+- `Made with ❤️ by Rodrigo Pita` footer
