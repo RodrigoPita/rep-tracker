@@ -5,7 +5,7 @@ import { exerciseLabel } from '@/lib/types'
 
 export default async function EditRoutinePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const db = supabaseServer()
+  const db = await supabaseServer()
 
   const [{ data: routine }, { data: reData }, { data: exercisesData }] = await Promise.all([
     db.from('routines').select('*').eq('id', id).single(),

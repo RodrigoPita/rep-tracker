@@ -262,7 +262,8 @@ export default function RoutineForm({ routineId, allExercises, initialData }: Pr
       const { error } = await supabase.from('routines').update({ name }).eq('id', rid)
       if (error) { toast.error('Não foi possível atualizar o treino.'); setSaving(false); return }
     } else {
-      const { data, error } = await supabase.from('routines').insert({ name }).select().single()
+      const { data: { user } } = await supabase.auth.getUser()
+      const { data, error } = await supabase.from('routines').insert({ name, user_id: user?.id }).select().single()
       if (error) { toast.error('Não foi possível criar o treino.'); setSaving(false); return }
       rid = data?.id
     }
