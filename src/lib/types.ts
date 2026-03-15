@@ -41,6 +41,7 @@ export type WorkoutSet = {
   set_number: number
   target_reps: number
   actual_reps: number | null
+  weight_kg: number | null
   completed: boolean
   completed_at: string | null
 }

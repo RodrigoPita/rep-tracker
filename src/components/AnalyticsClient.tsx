@@ -12,7 +12,8 @@ import {
 
 type SessionStat = {
   date: string
-  totalVolume: number
+  totalReps: number
+  weightedVolume: number | null
   avgReps: number
   bestReps: number
 }
@@ -74,23 +75,31 @@ export default function AnalyticsClient({ exercises, summary }: Props) {
       const sets: (WorkoutSet & {
         routine_exercises: { exercise_id: string }
         workout_sessions: { date: string }
+        weight_kg: number | null
       })[] = (data ?? []).filter((s: { routine_exercises: { exercise_id: string } }) =>
         exerciseIds.includes(s.routine_exercises?.exercise_id)
       )
 
-      const byDate: Record<string, number[]> = {}
+      const byDate: Record<string, { reps: number[]; volume: number; hasWeight: boolean }> = {}
       for (const set of sets) {
         const date = set.workout_sessions?.date
         if (!date || set.actual_reps == null) continue
-        if (!byDate[date]) byDate[date] = []
-        byDate[date].push(set.actual_reps)
+        if (!byDate[date]) byDate[date] = { reps: [], volume: 0, hasWeight: false }
+        byDate[date].reps.push(set.actual_reps)
+        if (set.weight_kg != null) {
+          byDate[date].volume += set.weight_kg * set.actual_reps
+          byDate[date].hasWeight = true
+        }
       }
+
+      const hasAnyWeight = Object.values(byDate).some((d) => d.hasWeight)
 
       const result: SessionStat[] = Object.entries(byDate)
         .sort(([a], [b]) => a.localeCompare(b))
-        .map(([date, reps]) => ({
+        .map(([date, { reps, volume, hasWeight }]) => ({
           date,
-          totalVolume: reps.reduce((s, r) => s + r, 0),
+          totalReps: reps.reduce((s, r) => s + r, 0),
+          weightedVolume: hasAnyWeight ? (hasWeight ? volume : 0) : null,
           avgReps: Math.round(reps.reduce((s, r) => s + r, 0) / reps.length),
           bestReps: Math.max(...reps),
         }))
@@ -104,6 +113,7 @@ export default function AnalyticsClient({ exercises, summary }: Props) {
   }, [selectedClassId, selectedExerciseId])
 
   const personalBest = stats.length > 0 ? Math.max(...stats.map((s) => s.bestReps)) : 0
+  const hasWeightData = stats.some((s) => s.weightedVolume != null)
 
   const selectedLabel =
     selectedExerciseId === 'all'
@@ -183,9 +193,28 @@ export default function AnalyticsClient({ exercises, summary }: Props) {
         </Card>
       ) : (
         <div className="space-y-4">
+          {hasWeightData && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm">Volume com carga por treino — {selectedLabel}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={200}>
+                  <LineChart data={stats}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+                    <YAxis tick={{ fontSize: 11 }} />
+                    <Tooltip formatter={(v) => [`${v} kg·reps`, 'Volume']} />
+                    <Line type="monotone" dataKey="weightedVolume" strokeWidth={2} dot={false} stroke="hsl(var(--primary))" />
+                  </LineChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          )}
+
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm">Volume total por treino — {selectedLabel}</CardTitle>
+              <CardTitle className="text-sm">Total de reps por treino — {selectedLabel}</CardTitle>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={200}>
@@ -194,7 +223,7 @@ export default function AnalyticsClient({ exercises, summary }: Props) {
                   <XAxis dataKey="date" tick={{ fontSize: 11 }} />
                   <YAxis tick={{ fontSize: 11 }} />
                   <Tooltip />
-                  <Line type="monotone" dataKey="totalVolume" strokeWidth={2} dot={false} stroke="hsl(var(--primary))" />
+                  <Line type="monotone" dataKey="totalReps" strokeWidth={2} dot={false} stroke="hsl(var(--primary))" />
                 </LineChart>
               </ResponsiveContainer>
             </CardContent>
