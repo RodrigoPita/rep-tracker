@@ -3,7 +3,7 @@ import RoutineForm from '@/components/RoutineForm'
 import type { ExerciseWithClass } from '@/lib/types'
 
 export default async function NewRoutinePage() {
-  const db = supabaseServer()
+  const db = await supabaseServer()
   const { data } = await db
     .from('exercises')
     .select('*, exercise_classes(*)')

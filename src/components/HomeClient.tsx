@@ -20,9 +20,10 @@ export default function HomeClient({ routines, activeSessions }: Props) {
 
   async function startSession(routineId: string) {
     setStarting(routineId)
+    const { data: { user } } = await supabase.auth.getUser()
     const { data, error } = await supabase
       .from('workout_sessions')
-      .insert({ routine_id: routineId, date: new Date().toISOString().split('T')[0] })
+      .insert({ routine_id: routineId, date: new Date().toISOString().split('T')[0], user_id: user?.id })
       .select()
       .single()
 
