@@ -48,28 +48,32 @@ type Summary = {
 export default function WorkoutClient({ session, initialSets }: Props) {
   const router = useRouter()
   const [sets, setSets] = useState<WorkoutSetWithExercise[]>(initialSets)
-  const [overrides, setOverrides] = useState<Record<string, string>>({})
+  const [repOverrides, setRepOverrides] = useState<Record<string, string>>({})
+  const [weightOverrides, setWeightOverrides] = useState<Record<string, string>>({})
   const [finishing, setFinishing] = useState(false)
   const [summary, setSummary] = useState<Summary | null>(null)
 
   async function completeSet(setId: string, targetReps: number) {
-    const parsed = overrides[setId] ? parseInt(overrides[setId]) : targetReps
+    const parsed = repOverrides[setId] ? parseInt(repOverrides[setId]) : targetReps
     const actualReps = Math.max(1, isNaN(parsed) ? targetReps : parsed)
+    const weightStr = weightOverrides[setId]
+    const weight_kg = weightStr ? parseFloat(weightStr) || null : null
+
     setSets((prev) =>
       prev.map((s) =>
         s.id === setId
-          ? { ...s, completed: true, actual_reps: actualReps, completed_at: new Date().toISOString() }
+          ? { ...s, completed: true, actual_reps: actualReps, weight_kg, completed_at: new Date().toISOString() }
           : s
       )
     )
     const { error } = await supabase
       .from('workout_sets')
-      .update({ completed: true, actual_reps: actualReps, completed_at: new Date().toISOString() })
+      .update({ completed: true, actual_reps: actualReps, weight_kg, completed_at: new Date().toISOString() })
       .eq('id', setId)
     if (error) {
       setSets((prev) =>
         prev.map((s) =>
-          s.id === setId ? { ...s, completed: false, actual_reps: null, completed_at: null } : s
+          s.id === setId ? { ...s, completed: false, actual_reps: null, weight_kg: null, completed_at: null } : s
         )
       )
       toast.error('Não foi possível registrar a série. Tente novamente.')
@@ -79,12 +83,12 @@ export default function WorkoutClient({ session, initialSets }: Props) {
   async function undoSet(setId: string) {
     setSets((prev) =>
       prev.map((s) =>
-        s.id === setId ? { ...s, completed: false, actual_reps: null, completed_at: null } : s
+        s.id === setId ? { ...s, completed: false, actual_reps: null, weight_kg: null, completed_at: null } : s
       )
     )
     const { error } = await supabase
       .from('workout_sets')
-      .update({ completed: false, actual_reps: null, completed_at: null })
+      .update({ completed: false, actual_reps: null, weight_kg: null, completed_at: null })
       .eq('id', setId)
     if (error) {
       setSets(initialSets)
@@ -190,10 +194,10 @@ export default function WorkoutClient({ session, initialSets }: Props) {
               key={exerciseSets[0].routine_exercise_id}
               className={[
                 'rounded-xl border bg-card card-elevated overflow-hidden transition-all',
-                groupDone ? 'opacity-70' : '',
+                groupDone ? 'border-green-300' : '',
               ].join(' ')}
             >
-              <div className={['px-4 py-3 border-b flex items-center justify-between', groupDone ? 'bg-muted/40' : 'bg-white'].join(' ')}>
+              <div className={['px-4 py-3 border-b flex items-center justify-between', groupDone ? 'bg-green-50' : 'bg-white'].join(' ')}>
                 <div>
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{className}</p>
                   <p className="font-semibold text-base">{variant ?? className}</p>
@@ -207,13 +211,19 @@ export default function WorkoutClient({ session, initialSets }: Props) {
                     key={set.id}
                     className={[
                       'flex items-center gap-3 px-4 py-3 transition-colors',
-                      set.completed ? 'bg-muted/20' : 'bg-white',
+                      set.completed ? 'bg-green-50/60' : 'bg-white',
                     ].join(' ')}
                   >
-                    {set.completed
-                      ? <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0" />
-                      : <Circle className="w-5 h-5 text-muted-foreground/40 shrink-0" />
-                    }
+                    <button
+                      onClick={() => set.completed ? undoSet(set.id) : completeSet(set.id, set.target_reps)}
+                      className="shrink-0 transition-transform active:scale-90"
+                      aria-label={set.completed ? 'Desfazer série' : 'Completar série'}
+                    >
+                      {set.completed
+                        ? <CheckCircle2 className="w-6 h-6 text-green-500" />
+                        : <Circle className="w-6 h-6 text-muted-foreground/30 hover:text-green-400 transition-colors" />
+                      }
+                    </button>
 
                     <span className={['text-sm font-medium w-14 shrink-0', set.completed ? 'text-muted-foreground' : ''].join(' ')}>
                       Série {set.set_number}
@@ -221,12 +231,30 @@ export default function WorkoutClient({ session, initialSets }: Props) {
 
                     <Input
                       type="number"
+                      placeholder="kg"
+                      value={weightOverrides[set.id] ?? (set.weight_kg != null ? String(set.weight_kg) : '')}
+                      onChange={(e) => {
+                        const val = e.target.value
+                        if (val === '' || parseFloat(val) >= 0) {
+                          setWeightOverrides((prev) => ({ ...prev, [set.id]: val }))
+                        }
+                      }}
+                      disabled={set.completed}
+                      className={[
+                        'w-16 h-9 text-center font-semibold tabular-nums shrink-0',
+                        set.completed ? 'text-muted-foreground' : '',
+                      ].join(' ')}
+                    />
+                    <span className="text-sm text-muted-foreground shrink-0">kg</span>
+
+                    <Input
+                      type="number"
                       placeholder={String(set.target_reps)}
-                      value={overrides[set.id] ?? (set.actual_reps != null ? String(set.actual_reps) : '')}
+                      value={repOverrides[set.id] ?? (set.actual_reps != null ? String(set.actual_reps) : '')}
                       onChange={(e) => {
                         const val = e.target.value
                         if (val === '' || parseInt(val) >= 1) {
-                          setOverrides((prev) => ({ ...prev, [set.id]: val }))
+                          setRepOverrides((prev) => ({ ...prev, [set.id]: val }))
                         }
                       }}
                       disabled={set.completed}
@@ -235,27 +263,7 @@ export default function WorkoutClient({ session, initialSets }: Props) {
                         set.completed ? 'text-muted-foreground line-through' : '',
                       ].join(' ')}
                     />
-
                     <span className="text-sm text-muted-foreground shrink-0">reps</span>
-
-                    <div className="ml-auto">
-                      {set.completed ? (
-                        <button
-                          onClick={() => undoSet(set.id)}
-                          className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 transition-colors"
-                        >
-                          Desfazer
-                        </button>
-                      ) : (
-                        <Button
-                          size="sm"
-                          className="h-9 px-5 bg-green-600 hover:bg-green-700 text-white font-semibold"
-                          onClick={() => completeSet(set.id, set.target_reps)}
-                        >
-                          Feito
-                        </Button>
-                      )}
-                    </div>
                   </div>
                 ))}
               </div>
