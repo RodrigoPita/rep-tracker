@@ -117,11 +117,11 @@ export default function WorkoutClient({ session, initialSets }: Props) {
             key={exerciseSets[0].routine_exercise_id}
             className={[
               'rounded-xl border bg-card card-elevated overflow-hidden transition-all',
-              groupDone ? 'border-green-300' : '',
+              groupDone ? 'opacity-70' : '',
             ].join(' ')}
           >
             {/* Exercise header */}
-            <div className={['px-4 py-3 border-b flex items-center justify-between', groupDone ? 'bg-green-50' : 'bg-white'].join(' ')}>
+            <div className={['px-4 py-3 border-b flex items-center justify-between', groupDone ? 'bg-muted/40' : 'bg-white'].join(' ')}>
               <div>
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{className}</p>
                 <p className="font-semibold text-base">{variant ?? className}</p>
@@ -138,19 +138,13 @@ export default function WorkoutClient({ session, initialSets }: Props) {
                   key={set.id}
                   className={[
                     'flex items-center gap-3 px-4 py-3 transition-colors',
-                    set.completed ? 'bg-green-50/60' : 'bg-white',
+                    set.completed ? 'bg-muted/20' : 'bg-white',
                   ].join(' ')}
                 >
-                  <button
-                    onClick={() => set.completed ? undoSet(set.id) : completeSet(set.id, set.target_reps)}
-                    className="shrink-0 transition-transform active:scale-90"
-                    aria-label={set.completed ? 'Desfazer série' : 'Completar série'}
-                  >
-                    {set.completed
-                      ? <CheckCircle2 className="w-6 h-6 text-green-500" />
-                      : <Circle className="w-6 h-6 text-muted-foreground/30 hover:text-green-400 transition-colors" />
-                    }
-                  </button>
+                  {set.completed
+                    ? <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0" />
+                    : <Circle className="w-5 h-5 text-muted-foreground/40 shrink-0" />
+                  }
 
                   <span className={['text-sm font-medium w-14 shrink-0', set.completed ? 'text-muted-foreground' : ''].join(' ')}>
                     Série {set.set_number}
@@ -174,6 +168,25 @@ export default function WorkoutClient({ session, initialSets }: Props) {
                   />
 
                   <span className="text-sm text-muted-foreground shrink-0">reps</span>
+
+                  <div className="ml-auto">
+                    {set.completed ? (
+                      <button
+                        onClick={() => undoSet(set.id)}
+                        className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 transition-colors"
+                      >
+                        Desfazer
+                      </button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        className="h-9 px-5 bg-green-600 hover:bg-green-700 text-white font-semibold"
+                        onClick={() => completeSet(set.id, set.target_reps)}
+                      >
+                        Feito
+                      </Button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
