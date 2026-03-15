@@ -53,6 +53,18 @@ export default function WorkoutClient({ session, initialSets }: Props) {
   const [finishing, setFinishing] = useState(false)
   const [summary, setSummary] = useState<Summary | null>(null)
 
+  // Weight column is shown per exercise group; auto-expanded if any set already has weight saved
+  const [weightExpanded, setWeightExpanded] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(
+      Object.entries(
+        initialSets.reduce<Record<string, boolean>>((acc, s) => {
+          if (s.weight_kg != null) acc[s.routine_exercise_id] = true
+          return acc
+        }, {})
+      )
+    )
+  )
+
   async function completeSet(setId: string, targetReps: number) {
     const parsed = repOverrides[setId] ? parseInt(repOverrides[setId]) : targetReps
     const actualReps = Math.max(1, isNaN(parsed) ? targetReps : parsed)
@@ -202,7 +214,17 @@ export default function WorkoutClient({ session, initialSets }: Props) {
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{className}</p>
                   <p className="font-semibold text-base">{variant ?? className}</p>
                 </div>
-                {groupDone && <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0" />}
+                <div className="flex items-center gap-2 shrink-0">
+                  {!groupDone && (
+                    <button
+                      onClick={() => setWeightExpanded((prev) => ({ ...prev, [exerciseSets[0].routine_exercise_id]: !prev[exerciseSets[0].routine_exercise_id] }))}
+                      className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {weightExpanded[exerciseSets[0].routine_exercise_id] ? '− carga' : '＋ carga'}
+                    </button>
+                  )}
+                  {groupDone && <CheckCircle2 className="w-5 h-5 text-green-500" />}
+                </div>
               </div>
 
               <div className="divide-y divide-border">
@@ -229,23 +251,27 @@ export default function WorkoutClient({ session, initialSets }: Props) {
                       Série {set.set_number}
                     </span>
 
-                    <Input
-                      type="number"
-                      placeholder="kg"
-                      value={weightOverrides[set.id] ?? (set.weight_kg != null ? String(set.weight_kg) : '')}
-                      onChange={(e) => {
-                        const val = e.target.value
-                        if (val === '' || parseFloat(val) >= 0) {
-                          setWeightOverrides((prev) => ({ ...prev, [set.id]: val }))
-                        }
-                      }}
-                      disabled={set.completed}
-                      className={[
-                        'w-16 h-9 text-center font-semibold tabular-nums shrink-0',
-                        set.completed ? 'text-muted-foreground' : '',
-                      ].join(' ')}
-                    />
-                    <span className="text-sm text-muted-foreground shrink-0">kg</span>
+                    {weightExpanded[set.routine_exercise_id] && (
+                      <>
+                        <Input
+                          type="number"
+                          placeholder="kg"
+                          value={weightOverrides[set.id] ?? (set.weight_kg != null ? String(set.weight_kg) : '')}
+                          onChange={(e) => {
+                            const val = e.target.value
+                            if (val === '' || parseFloat(val) >= 0) {
+                              setWeightOverrides((prev) => ({ ...prev, [set.id]: val }))
+                            }
+                          }}
+                          disabled={set.completed}
+                          className={[
+                            'w-16 h-9 text-center font-semibold tabular-nums shrink-0',
+                            set.completed ? 'text-muted-foreground' : '',
+                          ].join(' ')}
+                        />
+                        <span className="text-sm text-muted-foreground shrink-0">kg</span>
+                      </>
+                    )}
 
                     <Input
                       type="number"
