@@ -4,7 +4,7 @@ import type { ExerciseWithClass, WorkoutSession, WorkoutSet } from '@/lib/types'
 import { exerciseLabel } from '@/lib/types'
 
 export default async function AnalyticsPage() {
-  const db = supabaseServer()
+  const db = await supabaseServer()
 
   const [{ data: exercisesData }, { data: sessions }, { data: allSets }] = await Promise.all([
     db.from('exercises').select('*, exercise_classes(*)').order('exercise_classes(name)'),

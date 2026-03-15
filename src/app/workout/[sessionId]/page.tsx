@@ -4,7 +4,7 @@ import type { WorkoutSessionWithRoutine, WorkoutSetWithExercise } from '@/lib/ty
 
 export default async function WorkoutPage({ params }: { params: Promise<{ sessionId: string }> }) {
   const { sessionId } = await params
-  const db = supabaseServer()
+  const db = await supabaseServer()
 
   const [{ data: session }, { data: sets }] = await Promise.all([
     db.from('workout_sessions').select('*, routines(*)').eq('id', sessionId).single(),
