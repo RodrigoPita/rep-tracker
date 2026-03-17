@@ -90,7 +90,7 @@ export default function HomeClient({ routines, activeSessions }: Props) {
                   <p className="text-sm text-muted-foreground mt-0.5">{session.date}</p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  <Badge variant="secondary" className="bg-amber-100 text-amber-700 border-amber-200">Em andamento</Badge>
+                  <Badge variant="secondary" className="bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-400 dark:border-amber-900">Em andamento</Badge>
                   <ChevronRight className="w-4 h-4 text-muted-foreground" />
                 </div>
               </button>

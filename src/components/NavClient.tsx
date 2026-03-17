@@ -2,8 +2,9 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
+import { useTheme } from 'next-themes'
 import { supabase } from '@/lib/supabase'
-import { LogOut } from 'lucide-react'
+import { LogOut, Sun, Moon } from 'lucide-react'
 
 const tabs = [
   { href: '/', label: 'Início' },
@@ -18,6 +19,7 @@ type Props = {
 export default function NavClient({ userEmail }: Props) {
   const pathname = usePathname()
   const router = useRouter()
+  const { resolvedTheme, setTheme } = useTheme()
 
   function isActive(href: string) {
     if (href === '/') return pathname === '/'
@@ -31,24 +33,33 @@ export default function NavClient({ userEmail }: Props) {
   }
 
   return (
-    <header className="bg-white border-b border-border sticky top-0 z-10 shadow-sm">
+    <header className="bg-card border-b border-border sticky top-0 z-10 shadow-sm">
       <div className="max-w-2xl mx-auto px-4">
         <div className="py-3 flex items-center justify-between">
           <span className="text-xl font-bold tracking-tight text-primary">Rep Tracker</span>
-          {userEmail && (
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground hidden sm:block truncate max-w-[160px]">
-                {userEmail}
-              </span>
-              <button
-                onClick={logout}
-                className="text-muted-foreground hover:text-foreground transition-colors"
-                aria-label="Sair"
-              >
-                <LogOut className="w-4 h-4" />
-              </button>
-            </div>
-          )}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
+              className="text-muted-foreground hover:text-foreground transition-colors"
+              aria-label="Alternar tema"
+            >
+              {resolvedTheme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </button>
+            {userEmail && (
+              <>
+                <span className="text-xs text-muted-foreground hidden sm:block truncate max-w-[160px]">
+                  {userEmail}
+                </span>
+                <button
+                  onClick={logout}
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label="Sair"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
+              </>
+            )}
+          </div>
         </div>
         <nav className="flex gap-0 -mb-px">
           {tabs.map(({ href, label }) => (
