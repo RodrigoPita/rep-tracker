@@ -16,7 +16,7 @@ export default function LoginClient() {
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setLoading(true)
     setError(null)
@@ -80,7 +80,7 @@ export default function LoginClient() {
           </div>
 
           {error && <p className="text-sm text-destructive">{error}</p>}
-          {message && <p className="text-sm text-green-600">{message}</p>}
+          {message && <p className="text-sm text-green-600 dark:text-green-400">{message}</p>}
 
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? 'Aguarde…' : mode === 'login' ? 'Entrar' : 'Criar conta'}

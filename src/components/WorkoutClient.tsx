@@ -182,7 +182,7 @@ export default function WorkoutClient({ session, initialSets }: Props) {
                   className={[
                     'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium border transition-colors',
                     done
-                      ? 'bg-green-50 text-green-700 border-green-200'
+                      ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-950/40 dark:text-green-400 dark:border-green-900'
                       : 'bg-muted/50 text-muted-foreground border-transparent',
                   ].join(' ')}
                 >
@@ -209,7 +209,7 @@ export default function WorkoutClient({ session, initialSets }: Props) {
                 groupDone ? 'border-green-300' : '',
               ].join(' ')}
             >
-              <div className={['px-4 py-3 border-b flex items-center justify-between', groupDone ? 'bg-green-50' : 'bg-white'].join(' ')}>
+              <div className={['px-4 py-3 border-b flex items-center justify-between', groupDone ? 'bg-green-50 dark:bg-green-950/30' : 'bg-card'].join(' ')}>
                 <div>
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{className}</p>
                   <p className="font-semibold text-base">{variant ?? className}</p>
@@ -233,7 +233,7 @@ export default function WorkoutClient({ session, initialSets }: Props) {
                     key={set.id}
                     className={[
                       'flex items-center gap-3 px-4 py-3 transition-colors',
-                      set.completed ? 'bg-green-50/60' : 'bg-white',
+                      set.completed ? 'bg-green-50/60 dark:bg-green-950/20' : 'bg-card',
                     ].join(' ')}
                   >
                     <button

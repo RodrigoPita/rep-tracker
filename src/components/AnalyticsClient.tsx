@@ -7,6 +7,9 @@ import type { ExerciseWithClass, WorkoutSet } from '@/lib/types'
 import { exerciseLabel } from '@/lib/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select'
+import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from 'recharts'
 
@@ -122,7 +125,7 @@ export default function AnalyticsClient({ exercises, summary }: Props) {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Analytics</h1>
+      <h1 className="text-3xl font-bold tracking-tight">Analytics</h1>
 
       <div className="grid grid-cols-3 gap-3">
         <Card>
@@ -148,31 +151,32 @@ export default function AnalyticsClient({ exercises, summary }: Props) {
       <div className="space-y-3">
         <div className="space-y-1">
           <label className="text-sm font-medium">Classe de exercício</label>
-          <select
-            className="w-full border rounded-md px-3 py-2 text-sm bg-background"
-            value={selectedClassId}
-            onChange={(e) => setSelectedClassId(e.target.value)}
-          >
-            <option value="">Selecionar…</option>
-            {classes.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
+          <Select value={selectedClassId} onValueChange={(v) => setSelectedClassId(v ?? '')}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Selecionar…" />
+            </SelectTrigger>
+            <SelectContent>
+              {classes.map((c) => (
+                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         {selectedClassId && variantsForClass.length > 1 && (
           <div className="space-y-1">
             <label className="text-sm font-medium">Variante</label>
-            <select
-              className="w-full border rounded-md px-3 py-2 text-sm bg-background"
-              value={selectedExerciseId}
-              onChange={(e) => setSelectedExerciseId(e.target.value)}
-            >
-              <option value="all">Todas as variantes</option>
-              {variantsForClass.map((e) => (
-                <option key={e.id} value={e.id}>{e.variant}</option>
-              ))}
-            </select>
+            <Select value={selectedExerciseId} onValueChange={(v) => setSelectedExerciseId(v ?? 'all')}>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas as variantes</SelectItem>
+                {variantsForClass.map((e) => (
+                  <SelectItem key={e.id} value={e.id}>{e.variant}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         )}
       </div>
@@ -201,9 +205,9 @@ export default function AnalyticsClient({ exercises, summary }: Props) {
               <CardContent>
                 <ResponsiveContainer width="100%" height={200}>
                   <LineChart data={stats}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-                    <YAxis tick={{ fontSize: 11 }} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="currentColor" opacity={0.15} />
+                    <XAxis dataKey="date" tick={{ fontSize: 11, fill: 'currentColor' }} />
+                    <YAxis tick={{ fontSize: 11, fill: 'currentColor' }} />
                     <Tooltip formatter={(v) => [`${v} kg·reps`, 'Volume']} />
                     <Line type="monotone" dataKey="weightedVolume" strokeWidth={2} dot={false} stroke="hsl(var(--primary))" />
                   </LineChart>
