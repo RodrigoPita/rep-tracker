@@ -1,8 +1,8 @@
 import type { Metadata } from 'next'
 import { Geist } from 'next/font/google'
-import { Toaster } from 'sonner'
 import NavBar from '@/components/NavBar'
 import ThemeProvider from '@/components/ThemeProvider'
+import SonnerToaster from '@/components/SonnerToaster'
 import './globals.css'
 
 const geist = Geist({ subsets: ['latin'] })
@@ -21,7 +21,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <main className="max-w-2xl mx-auto px-4 py-6">
             {children}
           </main>
-          <Toaster richColors position="top-center" />
+          <SonnerToaster />
         </ThemeProvider>
       </body>
     </html>
