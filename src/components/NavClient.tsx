@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useTheme } from 'next-themes'
@@ -20,6 +21,8 @@ export default function NavClient({ userEmail }: Props) {
   const pathname = usePathname()
   const router = useRouter()
   const { resolvedTheme, setTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
 
   function isActive(href: string) {
     if (href === '/') return pathname === '/'
@@ -43,7 +46,7 @@ export default function NavClient({ userEmail }: Props) {
               className="text-muted-foreground hover:text-foreground transition-colors"
               aria-label="Alternar tema"
             >
-              {resolvedTheme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+              {mounted && resolvedTheme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
             {userEmail && (
               <>

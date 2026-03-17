@@ -14,6 +14,13 @@ type Props = {
   activeSessions: WorkoutSession[]
 }
 
+function getGreeting() {
+  const h = new Date().getHours()
+  if (h < 12) return 'Bom dia'
+  if (h < 18) return 'Boa tarde'
+  return 'Boa noite'
+}
+
 export default function HomeClient({ routines, activeSessions }: Props) {
   const router = useRouter()
   const [starting, setStarting] = useState<string | null>(null)
@@ -70,7 +77,7 @@ export default function HomeClient({ routines, activeSessions }: Props) {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Bom treino</h1>
+        <h1 className="text-3xl font-bold tracking-tight">{getGreeting()}</h1>
         <p className="text-muted-foreground mt-1">Escolha um treino para começar</p>
       </div>
 

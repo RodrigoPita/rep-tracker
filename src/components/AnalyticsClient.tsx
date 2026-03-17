@@ -201,9 +201,9 @@ export default function AnalyticsClient({ exercises, summary }: Props) {
               <CardContent>
                 <ResponsiveContainer width="100%" height={200}>
                   <LineChart data={stats}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-                    <YAxis tick={{ fontSize: 11 }} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="currentColor" opacity={0.15} />
+                    <XAxis dataKey="date" tick={{ fontSize: 11, fill: 'currentColor' }} />
+                    <YAxis tick={{ fontSize: 11, fill: 'currentColor' }} />
                     <Tooltip formatter={(v) => [`${v} kg·reps`, 'Volume']} />
                     <Line type="monotone" dataKey="weightedVolume" strokeWidth={2} dot={false} stroke="hsl(var(--primary))" />
                   </LineChart>
