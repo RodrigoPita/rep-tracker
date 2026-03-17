@@ -138,6 +138,62 @@
 
 ---
 
+## 20. Light / Dark Mode
+- Add a theme toggle (sun/moon icon) accessible from the nav or settings
+- Use Tailwind's `dark:` variant + `next-themes` for SSR-safe theme persistence
+- Minimalistic feel: clean whites/off-whites in light, dark greys (not pure black) in dark
+- All components and charts must respect the active theme
+
+---
+
+## 21. Dashboard (rename Analytics)
+- Rename the **Analytics** page to **Dashboard** — it should be the pulse of your training, not just charts
+- Home section: this week's exercise days strip (Mon–Sun) with a green check on days a session was completed (inspired by Fitbit's "Exercise days")
+- Routine progress wheel: circular arc showing sessions completed vs target (e.g. 32 / 45) — prominent, top of dashboard
+- Streak counter, personal records, total volume this week
+- Quick-access to the detailed analytics charts below the summary cards
+
+---
+
+## 22. Exercise Library Page
+- New **Library** page listing all exercises grouped by class (Flexão, Agachamento, etc.)
+- Filter bar at the top: filter by class or search by name
+- Each exercise card shows: name, variant, class — tappable to see stats for that exercise
+- Future: add muscle group tags (chest, legs, core, etc.) as a visual badge — leave schema space for it but don't implement tags yet
+
+---
+
+## 23. Set & Exercise Time Tracking
+- Record the timestamp when a set is started (user taps the circle) and when it is completed
+- Log **time per set** and derive **time per exercise** (first set started → last set completed)
+- Log **overall routine duration** (already done via `workout_sessions.completed_at`)
+- Surface these in the workout completion summary and on the Dashboard
+
+---
+
+## 24. Rest Timers
+- After completing a set, automatically start a **rest countdown** based on a configurable value
+  - Two separate values: **rest between sets** (same exercise) and **rest between exercises**
+  - Configured per routine or per exercise in the routine builder
+- Rest timer counts down to zero, then goes **negative** (overtime) — shown in red
+- User taps a button to end rest; actual rest duration is logged alongside the set
+- Dashboard / analytics can show: avg rest taken vs configured, how often the user went overtime
+- Visual: a subtle countdown bar or timer chip appears between set rows during rest
+
+---
+
+## 25. Achievements
+- Unlock badges for hitting milestones, e.g.:
+  - Complete 10 / 50 / 100 / 500 sessions of a given exercise
+  - Finish your first full routine period (e.g. 45 sessions)
+  - Log weight on 10 sets
+  - Complete a workout 5 days in a row (streak)
+- Achievement feed or shelf on the Dashboard
+- Achievements are stored in Supabase (`user_achievements` table) so they persist across devices
+- Notifications / toasts on unlock ("Conquista desbloqueada!")
+
+---
+
 ## Priority Order (suggested)
 
 | # | Item | Status | Impact | Effort |
@@ -152,19 +208,23 @@
 | 8 | Workout overview / completion summary | ✅ Done | Medium | Medium |
 | 9 | Auth + RLS | ✅ Done | High | High |
 | 10 | Weight tracking | ✅ Done | Medium | High |
-| 11 | UI/UX review | 🔜 Next | High | High |
+| 11 | UI/UX review + light/dark mode | 🔜 Next | High | High |
 | 12 | Responsive design | ⏳ Pending | High | Low |
-| 13 | Mobile feel | ⏳ Pending | High | Medium |
+| 13 | Mobile feel (bottom nav, PWA) | ⏳ Pending | High | Medium |
 | 14 | Routine periods + session counting | ⏳ Pending | High | High |
 | 15 | Archive routines | ⏳ Pending | High | Medium |
 | 16 | Calendar view | ⏳ Pending | High | High |
-| 17 | Analytics v2 | ⏳ Pending | High | High |
-| 18 | Automated tests | ⏳ Pending | Medium | High |
-| 19 | README | ⏳ Pending | Low | Low |
+| 17 | Dashboard (Analytics v2) | ⏳ Pending | High | High |
+| 18 | Exercise library page | ⏳ Pending | Medium | Medium |
+| 19 | Set & exercise time tracking | ⏳ Pending | Medium | High |
+| 20 | Rest timers | ⏳ Pending | High | High |
+| 21 | Achievements | ⏳ Pending | Medium | High |
+| 22 | Automated tests (Jest) | ⏳ Pending | Medium | High |
+| 23 | README | ⏳ Pending | Low | Low |
 
 ---
 
-## 18. Automated Tests
+## 22. Automated Tests
 - Use **Jest** as the test runner
 - Add unit tests for pure logic (exercise label formatting, duration formatting, analytics aggregations)
 - Add integration tests for Supabase queries using a test database or mocked client
@@ -173,7 +233,7 @@
 
 ---
 
-## 19. README
+## 23. README
 
 Follow the style of [chord-recognition](https://github.com/RodrigoPita/chord-recognition) and [songbook-builder](https://github.com/RodrigoPita/songbook-builder):
 
