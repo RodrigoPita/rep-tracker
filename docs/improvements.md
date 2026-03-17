@@ -80,14 +80,21 @@
 
 ---
 
-## 11. Responsive Design
+## 11. UI/UX Review
+- Full visual redesign pass before building new features
+- Rethink layout, color system, typography, spacing, and component styles
+- Establish a consistent design language to build on top of for all upcoming features
+
+---
+
+## 12. Responsive Design
 - Audit all pages at 320px, 375px, and 414px widths — no horizontal scroll, no clipped elements
 - Routine form exercise cards: ensure sets/reps inputs and buttons wrap properly on small screens
 - Workout checklist set rows: verify they don't overflow on narrow viewports
 - Analytics charts: ensure ResponsiveContainer fills width correctly on mobile
 - All tap targets must be at minimum 44×44px
 
-## 12. Mobile Feel
+## 13. Mobile Feel
 - The workout checklist is the most used screen — optimize it for one-handed use
 - Consider a floating "Feito" button per exercise group instead of per-set buttons
 - Add haptic feedback via `navigator.vibrate()` on set completion
@@ -95,27 +102,78 @@
 
 ---
 
-## Priority Order (suggested)
-
-| # | Item | Impact | Effort |
-|---|------|--------|--------|
-| 1 | Server components / SSR (perf) | High | Medium |
-| 2 | Nav active state + layout | High | Low |
-| 3 | Exercise search accent-insensitive | High | Low |
-| 4 | Analytics class-first filter | High | Medium |
-| 5 | Drag and drop routine builder | Medium | Medium |
-| 6 | Optimistic UI workout | Medium | Low |
-| 7 | Error handling | Medium | Medium |
-| 8 | Workout overview / completion summary | Medium | Medium |
-| 9 | Responsive design | High | Low |
-| 10 | Mobile feel | High | Medium |
-| 11 | Auth + RLS | High | High |
-| 12 | Weight tracking | Medium | High |
-| 13 | README | Low | Low |
+## 14. Routine Periods
+- Allow setting a target number of **training sessions** (not days) for a routine, e.g. 45 sessions
+- Track how many sessions have been completed against the target
+- Show progress on the routine card (e.g. "32 / 45 sessões")
+- Notify the user when fewer than ~5 sessions remain ("Quase lá! Faltam 3 treinos para mudar a rotina")
+- Auto-archive the routine when the period ends, or let the user archive manually
+- Archived routines preserve all historical workout data — no data loss on delete
 
 ---
 
-## 13. README
+## 15. Archive Routines
+- Add `archived_at` (nullable timestamp) to the `routines` table
+- Replace "delete routine" with "archive routine" — keeps all session history intact
+- Archived routines are hidden from the active list but accessible via a toggle ("Ver arquivadas")
+- Workout sessions and sets referencing archived routines remain queryable for analytics
+
+---
+
+## 16. Calendar View
+- New **Calendar** page showing a monthly grid
+- Days with completed workout sessions are highlighted (dot or accent background)
+- Tapping a day opens a detail view: which routine was done, exercises completed, sets/reps/weight
+- Supports navigating between months
+- Pairs with archived routines so past workouts remain visible even after archiving
+
+---
+
+## 17. Analytics v2
+- Current analytics are limited to a single exercise chart
+- Revamp to show: weekly/monthly volume trends, streak tracking, personal records per exercise
+- Routine-level summary: avg sessions per week, total volume lifted, most trained exercise class
+- Compare periods (e.g. this routine vs. previous one)
+- Surface insights based on routine period data (sessions completed, consistency)
+
+---
+
+## Priority Order (suggested)
+
+| # | Item | Status | Impact | Effort |
+|---|------|--------|--------|--------|
+| 1 | Server components / SSR (perf) | ✅ Done | High | Medium |
+| 2 | Nav active state + layout | ✅ Done | High | Low |
+| 3 | Exercise search accent-insensitive | ✅ Done | High | Low |
+| 4 | Analytics class-first filter | ✅ Done | High | Medium |
+| 5 | Drag and drop routine builder | ✅ Done | Medium | Medium |
+| 6 | Optimistic UI workout | ✅ Done | Medium | Low |
+| 7 | Error handling | ✅ Done | Medium | Medium |
+| 8 | Workout overview / completion summary | ✅ Done | Medium | Medium |
+| 9 | Auth + RLS | ✅ Done | High | High |
+| 10 | Weight tracking | ✅ Done | Medium | High |
+| 11 | UI/UX review | 🔜 Next | High | High |
+| 12 | Responsive design | ⏳ Pending | High | Low |
+| 13 | Mobile feel | ⏳ Pending | High | Medium |
+| 14 | Routine periods + session counting | ⏳ Pending | High | High |
+| 15 | Archive routines | ⏳ Pending | High | Medium |
+| 16 | Calendar view | ⏳ Pending | High | High |
+| 17 | Analytics v2 | ⏳ Pending | High | High |
+| 18 | Automated tests | ⏳ Pending | Medium | High |
+| 19 | README | ⏳ Pending | Low | Low |
+
+---
+
+## 18. Automated Tests
+- Use **Jest** as the test runner
+- Add unit tests for pure logic (exercise label formatting, duration formatting, analytics aggregations)
+- Add integration tests for Supabase queries using a test database or mocked client
+- Add E2E tests for the core flows: login → create routine → start workout → complete sets → finish
+- Set up CI to run tests on every PR
+
+---
+
+## 19. README
 
 Follow the style of [chord-recognition](https://github.com/RodrigoPita/chord-recognition) and [songbook-builder](https://github.com/RodrigoPita/songbook-builder):
 
