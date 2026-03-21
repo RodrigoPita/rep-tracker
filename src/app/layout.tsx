@@ -15,10 +15,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pt-BR" suppressHydrationWarning>
-      <body className={`${geist.className} bg-background text-foreground min-h-screen`}>
+      <body className={`${geist.className} bg-background text-foreground min-h-screen overflow-x-hidden`}>
         <ThemeProvider>
           <NavBar />
-          <main className="max-w-2xl mx-auto px-4 py-6">
+          <main className="max-w-2xl mx-auto px-4 py-6 min-w-0">
             {children}
           </main>
           <SonnerToaster />

@@ -70,7 +70,7 @@ export default function NavClient({ userEmail }: Props) {
               key={href}
               href={href}
               className={[
-                'px-4 py-2.5 text-sm font-medium border-b-2 transition-colors',
+                'px-3 py-2.5 text-sm font-medium border-b-2 transition-colors sm:px-4',
                 isActive(href)
                   ? 'border-primary text-primary'
                   : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border',

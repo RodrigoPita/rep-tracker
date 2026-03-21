@@ -115,7 +115,7 @@ function SortableRow({ row, index, total, onUpdate, onRemove, onMove }: Sortable
             <Button
               size="sm"
               variant="ghost"
-              className="h-8 w-8 p-0"
+              className="h-10 w-10 p-0"
               onClick={() => onMove(index, -1)}
               disabled={index === 0}
               aria-label="Mover para cima"
@@ -125,7 +125,7 @@ function SortableRow({ row, index, total, onUpdate, onRemove, onMove }: Sortable
             <Button
               size="sm"
               variant="ghost"
-              className="h-8 w-8 p-0"
+              className="h-10 w-10 p-0"
               onClick={() => onMove(index, 1)}
               disabled={index === total - 1}
               aria-label="Mover para baixo"
@@ -135,7 +135,7 @@ function SortableRow({ row, index, total, onUpdate, onRemove, onMove }: Sortable
             <Button
               size="sm"
               variant="ghost"
-              className="h-8 w-8 p-0"
+              className="h-10 w-10 p-0"
               onClick={() => onRemove(index)}
               aria-label="Remover exercício"
             >
