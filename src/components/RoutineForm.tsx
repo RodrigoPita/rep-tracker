@@ -76,71 +76,76 @@ function SortableRow({ row, index, total, onUpdate, onRemove, onMove }: Sortable
   return (
     <div ref={setNodeRef} style={style}>
       <Card>
-        <CardContent className="py-3 flex items-center gap-2 flex-wrap">
-          <button
-            type="button"
-            className="text-muted-foreground/50 hover:text-muted-foreground cursor-grab active:cursor-grabbing shrink-0 touch-none"
-            aria-label="Arrastar para reordenar"
-            {...attributes}
-            {...listeners}
-          >
-            <GripVertical className="w-4 h-4" />
-          </button>
-
-          <span className="font-medium flex-1 min-w-0 truncate text-sm">{row.label}</span>
-
-          <div className="flex items-center gap-1 shrink-0">
-            <Input
-              type="number"
-              value={row.sets}
-              onChange={(e) => onUpdate(index, 'sets', parseInt(e.target.value) || 1)}
-              className="w-14 h-8 text-center"
-              min={1}
-            />
-            <span className="text-sm text-muted-foreground">séries</span>
+        <CardContent className="py-3 space-y-2">
+          {/* Row 1: drag handle + exercise name */}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              className="text-muted-foreground/50 hover:text-muted-foreground cursor-grab active:cursor-grabbing shrink-0 touch-none"
+              aria-label="Arrastar para reordenar"
+              {...attributes}
+              {...listeners}
+            >
+              <GripVertical className="w-4 h-4" />
+            </button>
+            <span className="font-medium text-sm">{row.label}</span>
           </div>
 
-          <div className="flex items-center gap-1 shrink-0">
-            <Input
-              type="number"
-              value={row.target_reps}
-              onChange={(e) => onUpdate(index, 'target_reps', parseInt(e.target.value) || 1)}
-              className="w-14 h-8 text-center"
-              min={1}
-            />
-            <span className="text-sm text-muted-foreground">reps</span>
-          </div>
+          {/* Row 2: sets, reps, action buttons */}
+          <div className="flex items-center gap-2 pl-6">
+            <div className="flex items-center gap-1">
+              <Input
+                type="number"
+                value={row.sets}
+                onChange={(e) => onUpdate(index, 'sets', parseInt(e.target.value) || 1)}
+                className="w-14 h-8 text-center"
+                min={1}
+              />
+              <span className="text-sm text-muted-foreground">séries</span>
+            </div>
 
-          <div className="flex gap-1 shrink-0">
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-10 w-10 p-0"
-              onClick={() => onMove(index, -1)}
-              disabled={index === 0}
-              aria-label="Mover para cima"
-            >
-              ↑
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-10 w-10 p-0"
-              onClick={() => onMove(index, 1)}
-              disabled={index === total - 1}
-              aria-label="Mover para baixo"
-            >
-              ↓
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-10 w-10 p-0"
-              onClick={() => onRemove(index)}
-              aria-label="Remover exercício"
-            >
-              ✕
-            </Button>
+            <div className="flex items-center gap-1">
+              <Input
+                type="number"
+                value={row.target_reps}
+                onChange={(e) => onUpdate(index, 'target_reps', parseInt(e.target.value) || 1)}
+                className="w-14 h-8 text-center"
+                min={1}
+              />
+              <span className="text-sm text-muted-foreground">reps</span>
+            </div>
+
+            <div className="flex gap-1 ml-auto">
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-10 w-10 p-0"
+                onClick={() => onMove(index, -1)}
+                disabled={index === 0}
+                aria-label="Mover para cima"
+              >
+                ↑
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-10 w-10 p-0"
+                onClick={() => onMove(index, 1)}
+                disabled={index === total - 1}
+                aria-label="Mover para baixo"
+              >
+                ↓
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-10 w-10 p-0"
+                onClick={() => onRemove(index)}
+                aria-label="Remover exercício"
+              >
+                ✕
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
