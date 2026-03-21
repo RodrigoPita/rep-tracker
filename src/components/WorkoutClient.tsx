@@ -232,7 +232,7 @@ export default function WorkoutClient({ session, initialSets }: Props) {
                   <div
                     key={set.id}
                     className={[
-                      'flex items-center gap-3 px-4 py-3 transition-colors',
+                      'flex items-center gap-2 px-3 py-3 transition-colors sm:gap-3 sm:px-4',
                       set.completed ? 'bg-green-50/60 dark:bg-green-950/20' : 'bg-card',
                     ].join(' ')}
                   >
@@ -247,8 +247,8 @@ export default function WorkoutClient({ session, initialSets }: Props) {
                       }
                     </button>
 
-                    <span className={['text-sm font-medium w-14 shrink-0', set.completed ? 'text-muted-foreground' : ''].join(' ')}>
-                      Série {set.set_number}
+                    <span className={['text-xs font-medium w-10 shrink-0 sm:text-sm sm:w-14', set.completed ? 'text-muted-foreground' : ''].join(' ')}>
+                      S{set.set_number}
                     </span>
 
                     {weightExpanded[set.routine_exercise_id] && (
@@ -265,11 +265,11 @@ export default function WorkoutClient({ session, initialSets }: Props) {
                           }}
                           disabled={set.completed}
                           className={[
-                            'w-16 h-9 text-center font-semibold tabular-nums shrink-0',
+                            'w-14 h-9 text-center font-semibold tabular-nums shrink-0 sm:w-16',
                             set.completed ? 'text-muted-foreground' : '',
                           ].join(' ')}
                         />
-                        <span className="text-sm text-muted-foreground shrink-0">kg</span>
+                        <span className="text-xs text-muted-foreground shrink-0 sm:text-sm">kg</span>
                       </>
                     )}
 
@@ -285,7 +285,7 @@ export default function WorkoutClient({ session, initialSets }: Props) {
                       }}
                       disabled={set.completed}
                       className={[
-                        'w-16 h-9 text-center font-semibold tabular-nums shrink-0',
+                        'w-14 h-9 text-center font-semibold tabular-nums shrink-0 sm:w-16',
                         set.completed ? 'text-muted-foreground line-through' : '',
                       ].join(' ')}
                     />
