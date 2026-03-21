@@ -5,12 +5,12 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useTheme } from 'next-themes'
 import { supabase } from '@/lib/supabase'
-import { LogOut, Sun, Moon } from 'lucide-react'
+import { LogOut, Sun, Moon, Home, Dumbbell, BarChart2 } from 'lucide-react'
 
 const tabs = [
-  { href: '/', label: 'Início' },
-  { href: '/routines', label: 'Treinos' },
-  { href: '/analytics', label: 'Analytics' },
+  { href: '/', label: 'Início', icon: Home },
+  { href: '/routines', label: 'Treinos', icon: Dumbbell },
+  { href: '/analytics', label: 'Analytics', icon: BarChart2 },
 ]
 
 type Props = {
@@ -36,6 +36,7 @@ export default function NavClient({ userEmail }: Props) {
   }
 
   return (
+    <>
     <header className="bg-card border-b border-border sticky top-0 z-10 shadow-sm">
       <div className="max-w-2xl mx-auto px-4">
         <div className="py-3 flex items-center justify-between">
@@ -64,7 +65,8 @@ export default function NavClient({ userEmail }: Props) {
             )}
           </div>
         </div>
-        <nav className="flex gap-0 -mb-px">
+        {/* Top tabs — desktop only */}
+        <nav className="hidden md:flex gap-0 -mb-px">
           {tabs.map(({ href, label }) => (
             <Link
               key={href}
@@ -82,5 +84,30 @@ export default function NavClient({ userEmail }: Props) {
         </nav>
       </div>
     </header>
+
+    {/* Bottom nav — mobile only */}
+    {userEmail && (
+      <nav
+        className="md:hidden fixed bottom-0 left-0 right-0 z-10 bg-card border-t border-border"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      >
+        <div className="flex">
+          {tabs.map(({ href, label, icon: Icon }) => (
+            <Link
+              key={href}
+              href={href}
+              className={[
+                'flex-1 flex flex-col items-center gap-1 py-3 text-xs font-medium transition-colors',
+                isActive(href) ? 'text-primary' : 'text-muted-foreground',
+              ].join(' ')}
+            >
+              <Icon className="w-5 h-5" />
+              {label}
+            </Link>
+          ))}
+        </div>
+      </nav>
+    )}
+    </>
   )
 }
