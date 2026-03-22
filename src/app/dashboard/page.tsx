@@ -3,6 +3,13 @@ import DashboardClient from '@/components/DashboardClient'
 import type { ExerciseWithClass, WorkoutSession, WorkoutSet } from '@/lib/types'
 import { exerciseLabel } from '@/lib/types'
 
+function formatMin(min: number): string {
+  if (min < 60) return `${min}min`
+  const h = Math.floor(min / 60)
+  const m = min % 60
+  return m > 0 ? `${h}h ${m}min` : `${h}h`
+}
+
 export default async function DashboardPage() {
   const db = await supabaseServer()
 
@@ -14,7 +21,7 @@ export default async function DashboardPage() {
   ] = await Promise.all([
     db.from('exercises').select('*, exercise_classes(*)').order('exercise_classes(name)'),
     db.from('workout_sessions').select('*').not('completed_at', 'is', null).order('date'),
-    db.from('workout_sets').select('*, routine_exercises(exercise_id)').eq('completed', true),
+    db.from('workout_sets').select('*, routine_exercises(exercise_id)').eq('completed', true).not('completed_at', 'is', null),
     db.from('routine_periods')
       .select('*, routines(id, name)')
       .is('completed_at', null)
@@ -25,6 +32,40 @@ export default async function DashboardPage() {
   const exercises = (exercisesData ?? []) as ExerciseWithClass[]
   const completedSessions: WorkoutSession[] = sessionsData ?? []
   const completedSets: (WorkoutSet & { routine_exercises: { exercise_id: string } })[] = allSetsData ?? []
+
+  // Average session duration
+  const avgDurationMin = completedSessions.length > 0
+    ? Math.round(
+        completedSessions.reduce((sum, s) => {
+          if (!s.completed_at) return sum
+          return sum + (new Date(s.completed_at).getTime() - new Date(s.created_at).getTime()) / 60000
+        }, 0) / completedSessions.length
+      )
+    : null
+
+  // Average active time per session (only for sets with started_at tracking)
+  const setsBySession = completedSets.reduce<Record<string, WorkoutSet[]>>((acc, s) => {
+    if (!acc[s.session_id]) acc[s.session_id] = []
+    acc[s.session_id].push(s)
+    return acc
+  }, {})
+  const sessionActiveTimes = Object.values(setsBySession)
+    .map((sets) =>
+      sets.reduce((sum, s) => {
+        if (s.started_at && s.completed_at) {
+          return sum + (new Date(s.completed_at).getTime() - new Date(s.started_at).getTime()) / 60000
+        }
+        return sum
+      }, 0)
+    )
+    .filter((t) => t > 0)
+  const avgActiveMin = sessionActiveTimes.length > 0
+    ? Math.round(sessionActiveTimes.reduce((a, b) => a + b, 0) / sessionActiveTimes.length)
+    : null
+
+  const timeStats = avgDurationMin !== null
+    ? { avgDuration: formatMin(avgDurationMin), avgActive: avgActiveMin !== null ? formatMin(avgActiveMin) : null }
+    : null
 
   // Most trained exercise
   const exerciseCount: Record<string, number> = {}
@@ -111,6 +152,7 @@ export default async function DashboardPage() {
       periodProgress={periodProgress}
       weeklyData={weeklyData}
       topExercises={topExercises}
+      timeStats={timeStats}
     />
   )
 }

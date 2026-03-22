@@ -189,11 +189,19 @@ export default function WorkoutClient({ session, initialSets }: Props) {
       return
     }
 
-    // Start rest timer if this exercise has rest_seconds configured
+    // Start rest timer if this exercise has rest_seconds configured,
+    // but not after the last set of the last exercise
     const set = sets.find((s) => s.id === setId)
     const restSeconds = set?.routine_exercises?.rest_seconds
     if (restSeconds && restSeconds > 0) {
-      setRestState({ afterSetId: setId, startedAt: new Date() })
+      const maxOrder = Math.max(...sets.map((s) => s.routine_exercises.display_order))
+      const lastExerciseSets = sets.filter((s) => s.routine_exercises.display_order === maxOrder)
+      const lastSetNumber = Math.max(...lastExerciseSets.map((s) => s.set_number))
+      const isLastSetOfLastExercise =
+        lastExerciseSets.find((s) => s.set_number === lastSetNumber)?.id === setId
+      if (!isLastSetOfLastExercise) {
+        setRestState({ afterSetId: setId, startedAt: new Date() })
+      }
     }
   }
 
