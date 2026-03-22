@@ -120,6 +120,31 @@ export default function WorkoutClient({ session, initialSets }: Props) {
       toast.error('Não foi possível finalizar o treino. Tente novamente.')
       return
     }
+    // Check if active period is now complete
+    const { data: period } = await supabase
+      .from('routine_periods')
+      .select('*')
+      .eq('routine_id', session.routine_id)
+      .is('completed_at', null)
+      .maybeSingle()
+
+    if (period) {
+      const { count } = await supabase
+        .from('workout_sessions')
+        .select('*', { count: 'exact', head: true })
+        .eq('routine_id', session.routine_id)
+        .not('completed_at', 'is', null)
+        .gte('completed_at', period.started_at)
+
+      if (count !== null && count >= period.target_sessions) {
+        await supabase
+          .from('routine_periods')
+          .update({ completed_at: completedAt })
+          .eq('id', period.id)
+        toast.success(`Ciclo concluído! ${period.target_sessions} treinos completados.`)
+      }
+    }
+
     const completedSets = sets.filter((s) => s.completed)
     setSummary({
       setsCompleted: completedSets.length,
