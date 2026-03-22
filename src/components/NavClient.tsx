@@ -15,9 +15,10 @@ const tabs = [
 
 type Props = {
   userEmail: string | null
+  displayName: string | null
 }
 
-export default function NavClient({ userEmail }: Props) {
+export default function NavClient({ userEmail, displayName }: Props) {
   const pathname = usePathname()
   const router = useRouter()
   const { resolvedTheme, setTheme } = useTheme()
@@ -52,7 +53,7 @@ export default function NavClient({ userEmail }: Props) {
             {userEmail && (
               <>
                 <span className="text-xs text-muted-foreground hidden sm:block truncate max-w-[160px]">
-                  {userEmail}
+                  {displayName}
                 </span>
                 <button
                   onClick={logout}
