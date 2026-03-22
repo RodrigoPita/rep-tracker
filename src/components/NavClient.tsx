@@ -55,6 +55,9 @@ export default function NavClient({ userEmail, displayName }: Props) {
                 <span className="text-xs text-muted-foreground hidden sm:block truncate max-w-[160px]">
                   {displayName}
                 </span>
+                <span className="sm:hidden flex items-center justify-center w-7 h-7 rounded-full bg-primary/10 text-primary text-xs font-semibold shrink-0">
+                  {displayName?.charAt(0).toUpperCase()}
+                </span>
                 <button
                   onClick={logout}
                   className="text-muted-foreground hover:text-foreground transition-colors"
