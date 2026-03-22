@@ -5,21 +5,23 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useTheme } from 'next-themes'
 import { supabase } from '@/lib/supabase'
-import { LogOut, Sun, Moon, Home, Dumbbell, CalendarDays, LayoutDashboard } from 'lucide-react'
+import { LogOut, Sun, Moon, Home, Dumbbell, CalendarDays, LayoutDashboard, BookOpen, ShieldCheck } from 'lucide-react'
 
 const tabs = [
   { href: '/', label: 'Início', icon: Home },
   { href: '/routines', label: 'Treinos', icon: Dumbbell },
   { href: '/calendar', label: 'Calendário', icon: CalendarDays },
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/library', label: 'Biblioteca', icon: BookOpen },
 ]
 
 type Props = {
   userEmail: string | null
   displayName: string | null
+  isAdmin: boolean
 }
 
-export default function NavClient({ userEmail, displayName }: Props) {
+export default function NavClient({ userEmail, displayName, isAdmin }: Props) {
   const pathname = usePathname()
   const router = useRouter()
   const { resolvedTheme, setTheme } = useTheme()
@@ -44,6 +46,12 @@ export default function NavClient({ userEmail, displayName }: Props) {
         <div className="py-3 flex items-center justify-between">
           <span className="text-xl font-bold tracking-tight text-primary">Rep Tracker</span>
           <div className="flex items-center gap-2">
+            {isAdmin && (
+              <span className="flex items-center gap-1 text-xs font-medium text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                <ShieldCheck className="w-3 h-3" />
+                Admin
+              </span>
+            )}
             <button
               onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
               className="text-muted-foreground hover:text-foreground transition-colors"

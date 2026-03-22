@@ -10,5 +10,7 @@ export default async function NavBar() {
     ?? user?.email?.split('@')[0]
     ?? null
 
-  return <NavClient userEmail={user?.email ?? null} displayName={displayName} />
+  const isAdmin = user?.id === process.env.ADMIN_USER_ID
+
+  return <NavClient userEmail={user?.email ?? null} displayName={displayName} isAdmin={isAdmin} />
 }
