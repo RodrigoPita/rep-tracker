@@ -76,6 +76,15 @@ export type WorkoutSessionWithRoutine = WorkoutSession & {
   routines: Routine
 }
 
+export type CalendarSession = WorkoutSession & {
+  routines: Routine
+  workout_sets: Array<WorkoutSet & {
+    routine_exercises: RoutineExercise & {
+      exercises: Exercise & { exercise_classes: { name: string } }
+    }
+  }>
+}
+
 /** "Flexão — Diamante" */
 export function exerciseLabel(exercise: ExerciseWithClass): string {
   return `${exercise.exercise_classes.name} — ${exercise.variant}`
