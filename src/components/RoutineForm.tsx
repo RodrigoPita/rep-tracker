@@ -27,13 +27,14 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical } from 'lucide-react'
+import { GripVertical, Timer } from 'lucide-react'
 
 type RowDraft = {
   exercise_id: string
   label: string
   sets: number
   target_reps: number
+  rest_seconds: number | null
   display_order: number
 }
 
@@ -57,11 +58,12 @@ type SortableRowProps = {
   index: number
   total: number
   onUpdate: (index: number, field: 'sets' | 'target_reps', value: number) => void
+  onUpdateRest: (index: number, value: number | null) => void
   onRemove: (index: number) => void
   onMove: (index: number, direction: -1 | 1) => void
 }
 
-function SortableRow({ row, index, total, onUpdate, onRemove, onMove }: SortableRowProps) {
+function SortableRow({ row, index, total, onUpdate, onUpdateRest, onRemove, onMove }: SortableRowProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: row.exercise_id,
   })
@@ -113,6 +115,22 @@ function SortableRow({ row, index, total, onUpdate, onRemove, onMove }: Sortable
                 min={1}
               />
               <span className="text-sm text-muted-foreground">reps</span>
+            </div>
+
+            <div className="flex items-center gap-1">
+              <Timer className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+              <Input
+                type="number"
+                value={row.rest_seconds ?? ''}
+                onChange={(e) => {
+                  const v = parseInt(e.target.value)
+                  onUpdateRest(index, e.target.value === '' || isNaN(v) ? null : v)
+                }}
+                placeholder="—"
+                className="w-14 h-8 text-center"
+                min={1}
+              />
+              <span className="text-sm text-muted-foreground">s</span>
             </div>
 
             <div className="flex gap-1 ml-auto">
@@ -192,6 +210,7 @@ export default function RoutineForm({ routineId, allExercises, initialData }: Pr
         label: exerciseLabel(exercise),
         sets: 3,
         target_reps: 10,
+        rest_seconds: null,
         display_order: prev.length,
       },
     ])
@@ -231,6 +250,10 @@ export default function RoutineForm({ routineId, allExercises, initialData }: Pr
 
   function updateRow(index: number, field: 'sets' | 'target_reps', value: number) {
     setRows((prev) => prev.map((r, i) => (i === index ? { ...r, [field]: value } : r)))
+  }
+
+  function updateRowRest(index: number, value: number | null) {
+    setRows((prev) => prev.map((r, i) => (i === index ? { ...r, rest_seconds: value } : r)))
   }
 
   function removeRow(index: number) {
@@ -294,6 +317,7 @@ export default function RoutineForm({ routineId, allExercises, initialData }: Pr
           exercise_id: r.exercise_id,
           sets: r.sets,
           target_reps: r.target_reps,
+          rest_seconds: r.rest_seconds ?? null,
           display_order: i,
         }))
       )
@@ -330,6 +354,7 @@ export default function RoutineForm({ routineId, allExercises, initialData }: Pr
                   index={i}
                   total={rows.length}
                   onUpdate={updateRow}
+                  onUpdateRest={updateRowRest}
                   onRemove={removeRow}
                   onMove={moveRow}
                 />

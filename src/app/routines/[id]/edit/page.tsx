@@ -21,6 +21,7 @@ export default async function EditRoutinePage({ params }: { params: Promise<{ id
     label: exerciseLabel(re.exercises),
     sets: re.sets,
     target_reps: re.target_reps,
+    rest_seconds: re.rest_seconds ?? null,
     display_order: i,
   }))
 

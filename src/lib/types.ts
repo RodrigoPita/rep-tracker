@@ -35,6 +35,7 @@ export type RoutineExercise = {
   sets: number
   target_reps: number
   display_order: number
+  rest_seconds: number | null
 }
 
 export type WorkoutSession = {
@@ -55,6 +56,8 @@ export type WorkoutSet = {
   weight_kg: number | null
   completed: boolean
   completed_at: string | null
+  started_at: string | null
+  rest_ended_at: string | null
 }
 
 // Joined types used in UI

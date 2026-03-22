@@ -44,10 +44,11 @@ type Props = {
   periodProgress: PeriodProgress
   weeklyData: { week: string; count: number }[]
   topExercises: { label: string; count: number }[]
+  timeStats: { avgDuration: string; avgActive: string | null } | null
 }
 
 export default function DashboardClient({
-  sessions, summary, periodProgress, weeklyData, topExercises,
+  sessions, summary, periodProgress, weeklyData, topExercises, timeStats,
 }: Props) {
   const weekStrip = useMemo(() => {
     const now = new Date()
@@ -146,6 +147,26 @@ export default function DashboardClient({
         </CardHeader>
         <CardContent className="text-center"><p className="text-sm font-semibold">{summary.mostTrained}</p></CardContent>
       </Card>
+
+      {/* Time stats */}
+      {timeStats && (
+        <div className="grid grid-cols-2 gap-3">
+          <Card>
+            <CardHeader className="pb-1">
+              <CardTitle className="text-xs text-muted-foreground uppercase text-center">Duração média</CardTitle>
+            </CardHeader>
+            <CardContent className="text-center"><p className="text-2xl font-bold">{timeStats.avgDuration}</p></CardContent>
+          </Card>
+          {timeStats.avgActive && (
+            <Card>
+              <CardHeader className="pb-1">
+                <CardTitle className="text-xs text-muted-foreground uppercase text-center">Tempo ativo médio</CardTitle>
+              </CardHeader>
+              <CardContent className="text-center"><p className="text-2xl font-bold">{timeStats.avgActive}</p></CardContent>
+            </Card>
+          )}
+        </div>
+      )}
 
       {/* Workouts per week */}
       {weeklyData.some((d) => d.count > 0) && (
