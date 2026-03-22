@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
-import type { Routine, WorkoutSession } from '@/lib/types'
+import type { Routine, RoutinePeriod, WorkoutSession } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ChevronRight, Play, Plus } from 'lucide-react'
@@ -12,6 +12,8 @@ import { ChevronRight, Play, Plus } from 'lucide-react'
 type Props = {
   routines: Routine[]
   activeSessions: WorkoutSession[]
+  periods: RoutinePeriod[]
+  sessionCounts: Record<string, number>
 }
 
 function getGreeting() {
@@ -21,7 +23,7 @@ function getGreeting() {
   return 'Boa noite'
 }
 
-export default function HomeClient({ routines, activeSessions }: Props) {
+export default function HomeClient({ routines, activeSessions, periods, sessionCounts }: Props) {
   const router = useRouter()
   const [starting, setStarting] = useState<string | null>(null)
 
@@ -130,23 +132,43 @@ export default function HomeClient({ routines, activeSessions }: Props) {
             </Button>
           </div>
         ) : (
-          routines.map((routine) => (
-            <div
-              key={routine.id}
-              className="rounded-xl border bg-card card-elevated px-4 py-4 flex items-center justify-between gap-3"
-            >
-              <p className="font-semibold truncate">{routine.name}</p>
-              <Button
-                size="sm"
-                className="shrink-0 gap-1.5"
-                onClick={() => startSession(routine.id)}
-                disabled={starting === routine.id}
+          routines.map((routine) => {
+            const period = periods.find((p) => p.routine_id === routine.id)
+            const done = period ? (sessionCounts[routine.id] ?? 0) : 0
+            const pct = period ? Math.min((done / period.target_sessions) * 100, 100) : null
+            return (
+              <div
+                key={routine.id}
+                className="rounded-xl border bg-card card-elevated px-4 py-4 flex items-center justify-between gap-3"
               >
-                <Play className="w-3.5 h-3.5" />
-                {starting === routine.id ? 'Iniciando…' : 'Iniciar'}
-              </Button>
-            </div>
-          ))
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold truncate">{routine.name}</p>
+                  {period && (
+                    <div className="mt-1.5 space-y-1">
+                      <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-primary transition-all"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {done} / {period.target_sessions} treinos
+                      </p>
+                    </div>
+                  )}
+                </div>
+                <Button
+                  size="sm"
+                  className="shrink-0 gap-1.5"
+                  onClick={() => startSession(routine.id)}
+                  disabled={starting === routine.id}
+                >
+                  <Play className="w-3.5 h-3.5" />
+                  {starting === routine.id ? 'Iniciando…' : 'Iniciar'}
+                </Button>
+              </div>
+            )
+          })
         )}
       </section>
     </div>

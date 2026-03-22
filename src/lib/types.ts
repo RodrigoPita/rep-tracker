@@ -14,6 +14,17 @@ export type Exercise = {
 export type Routine = {
   id: string
   name: string
+  archived_at: string | null
+  created_at: string
+}
+
+export type RoutinePeriod = {
+  id: string
+  routine_id: string
+  user_id: string
+  target_sessions: number
+  started_at: string
+  completed_at: string | null
   created_at: string
 }
 

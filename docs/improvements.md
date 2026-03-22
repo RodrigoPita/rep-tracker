@@ -208,11 +208,11 @@
 | 8 | Workout overview / completion summary | ✅ Done | Medium | Medium |
 | 9 | Auth + RLS | ✅ Done | High | High |
 | 10 | Weight tracking | ✅ Done | Medium | High |
-| 11 | UI/UX review + light/dark mode | 🔜 Next | High | High |
-| 12 | Responsive design | ⏳ Pending | High | Low |
-| 13 | Mobile feel (bottom nav, PWA) | ⏳ Pending | High | Medium |
-| 14 | Routine periods + session counting | ⏳ Pending | High | High |
-| 15 | Archive routines | ⏳ Pending | High | Medium |
+| 11 | UI/UX review + light/dark mode | ✅ Done | High | High |
+| 12 | Responsive design | ✅ Done | High | Low |
+| 13 | Mobile feel (bottom nav, PWA) | ✅ Done | High | Medium |
+| 14 | Routine periods + session counting | ✅ Done | High | High |
+| 15 | Archive routines | ✅ Done | High | Medium |
 | 16 | Calendar view | ⏳ Pending | High | High |
 | 17 | Dashboard (Analytics v2) | ⏳ Pending | High | High |
 | 18 | Exercise library page | ⏳ Pending | Medium | Medium |
