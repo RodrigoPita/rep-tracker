@@ -5,8 +5,8 @@ import { Check } from 'lucide-react'
 import type { WorkoutSession } from '@/lib/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
-  type BarShapeProps,
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  CartesianGrid, type BarShapeProps,
 } from 'recharts'
 
 type ChartTooltipProps = {
@@ -49,10 +49,9 @@ type Props = {
 export default function DashboardClient({
   sessions, summary, periodProgress, weeklyData, topExercises,
 }: Props) {
-  // Weekly strip — Sun first, computed client-side for correct local timezone
   const weekStrip = useMemo(() => {
     const now = new Date()
-    const dow = now.getDay() // 0 = Sun
+    const dow = now.getDay()
     const sunday = new Date(now)
     sunday.setDate(now.getDate() - dow)
     const sessionDates = new Set(sessions.map((s) => s.date))
@@ -64,12 +63,7 @@ export default function DashboardClient({
       const dateStr = d.toISOString().split('T')[0]
       const raw = d.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '')
       const label = raw.charAt(0).toUpperCase() + raw.slice(1, 3)
-      return {
-        date: dateStr,
-        label,
-        hasSession: sessionDates.has(dateStr),
-        isToday: dateStr === todayStr,
-      }
+      return { date: dateStr, label, hasSession: sessionDates.has(dateStr), isToday: dateStr === todayStr }
     })
   }, [sessions])
 
@@ -92,18 +86,13 @@ export default function DashboardClient({
                 <div key={date} className="flex flex-col items-center gap-1.5">
                   <div className={[
                     'w-9 h-9 rounded-full flex items-center justify-center transition-colors',
-                    hasSession
-                      ? 'bg-primary text-primary-foreground'
-                      : isToday
-                      ? 'ring-2 ring-primary text-primary'
+                    hasSession ? 'bg-primary text-primary-foreground'
+                      : isToday ? 'ring-2 ring-primary text-primary'
                       : 'bg-muted/40 text-muted-foreground',
                   ].join(' ')}>
                     {hasSession && <Check className="w-4 h-4" />}
                   </div>
-                  <span className={[
-                    'text-xs font-medium',
-                    isToday ? 'text-primary' : 'text-muted-foreground',
-                  ].join(' ')}>
+                  <span className={['text-xs font-medium', isToday ? 'text-primary' : 'text-muted-foreground'].join(' ')}>
                     {label}
                   </span>
                 </div>
@@ -181,12 +170,8 @@ export default function DashboardClient({
                     const payload = props.payload as { count: number }
                     if (height <= 0) return <g />
                     return (
-                      <rect
-                        x={x} y={y} width={width} height={height}
-                        fill="var(--primary)"
-                        opacity={payload.count === maxWeekly ? 1 : 0.35}
-                        rx={3}
-                      />
+                      <rect x={x} y={y} width={width} height={height}
+                        fill="var(--primary)" opacity={payload.count === maxWeekly ? 1 : 0.35} rx={3} />
                     )
                   }}
                 />
@@ -228,8 +213,7 @@ function ProgressWheel({ completed, target }: { completed: number; target: numbe
     <div className="relative w-24 h-24 shrink-0">
       <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
         <circle cx="50" cy="50" r={r} fill="none" strokeWidth="10" stroke="currentColor" className="text-muted/20" />
-        <circle
-          cx="50" cy="50" r={r} fill="none" strokeWidth="10" stroke="currentColor"
+        <circle cx="50" cy="50" r={r} fill="none" strokeWidth="10" stroke="currentColor"
           strokeLinecap="round"
           strokeDasharray={`${circumference} ${circumference}`}
           strokeDashoffset={dashOffset}
