@@ -5,13 +5,13 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useTheme } from 'next-themes'
 import { supabase } from '@/lib/supabase'
-import { LogOut, Sun, Moon, Home, Dumbbell, BarChart2, CalendarDays } from 'lucide-react'
+import { LogOut, Sun, Moon, Home, Dumbbell, CalendarDays, LayoutDashboard } from 'lucide-react'
 
 const tabs = [
   { href: '/', label: 'Início', icon: Home },
   { href: '/routines', label: 'Treinos', icon: Dumbbell },
   { href: '/calendar', label: 'Calendário', icon: CalendarDays },
-  { href: '/analytics', label: 'Analytics', icon: BarChart2 },
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
 ]
 
 type Props = {
