@@ -12,15 +12,19 @@ export default async function EditRoutinePage({ params }: { params: Promise<{ id
     db.from('routine_exercises')
       .select('*, exercises(*, exercise_classes(*))')
       .eq('routine_id', id)
+      .is('deleted_at', null)
       .order('display_order'),
     db.from('exercises').select('*, exercise_classes(*)').order('exercise_classes(name)'),
   ])
 
   const initialRows = (reData as RoutineExerciseWithExercise[] ?? []).map((re, i) => ({
+    id: re.id,
     exercise_id: re.exercise_id,
     label: exerciseLabel(re.exercises),
+    is_timed: re.exercises.exercise_classes.is_timed,
     sets: re.sets,
     target_reps: re.target_reps,
+    target_seconds: re.target_seconds ?? null,
     rest_seconds: re.rest_seconds ?? null,
     display_order: i,
   }))

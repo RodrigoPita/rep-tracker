@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Plus, X, Check, Search, Trash2 } from 'lucide-react'
+import { Plus, X, Check, Search, Trash2, Timer } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -24,6 +24,7 @@ export default function LibraryClient({ classes: initialClasses, isAdmin }: Prop
   const [showNewClass, setShowNewClass] = useState(false)
   const [newClassName, setNewClassName] = useState('')
   const [newClassVariant, setNewClassVariant] = useState('')
+  const [newClassIsTimed, setNewClassIsTimed] = useState(false)
   const [saving, setSaving] = useState(false)
   const [deleteMode, setDeleteMode] = useState(false)
 
@@ -80,6 +81,19 @@ export default function LibraryClient({ classes: initialClasses, isAdmin }: Prop
     setSaving(false)
   }
 
+  async function deleteClass(classId: string, className: string) {
+    // Delete all variants first, then the class
+    const { error: exError } = await supabase.from('exercises').delete().eq('class_id', classId)
+    if (exError) { toast.error('Erro ao remover exercícios da classe.'); return }
+    const { error } = await supabase.from('exercise_classes').delete().eq('id', classId)
+    if (error) {
+      toast.error('Erro ao remover classe.')
+    } else {
+      setClasses((prev) => prev.filter((cls) => cls.id !== classId))
+      toast.success(`${className} removida.`)
+    }
+  }
+
   async function deleteVariant(classId: string, exerciseId: string, variant: string) {
     const { error } = await supabase.from('exercises').delete().eq('id', exerciseId)
     if (error) {
@@ -104,8 +118,8 @@ export default function LibraryClient({ classes: initialClasses, isAdmin }: Prop
 
     const { data: cls, error: clsError } = await supabase
       .from('exercise_classes')
-      .insert({ name })
-      .select('id, name')
+      .insert({ name, is_timed: newClassIsTimed })
+      .select('id, name, is_timed')
       .single()
     if (clsError) {
       toast.error('Erro ao criar classe.')
@@ -125,12 +139,13 @@ export default function LibraryClient({ classes: initialClasses, isAdmin }: Prop
     }
 
     setClasses((prev) =>
-      [...prev, { id: cls.id, name: cls.name, exercises: [ex] }]
+      [...prev, { id: cls.id, name: cls.name, is_timed: cls.is_timed ?? false, exercises: [ex] }]
         .sort((a, b) => a.name.localeCompare(b.name))
     )
     setShowNewClass(false)
     setNewClassName('')
     setNewClassVariant('')
+    setNewClassIsTimed(false)
     toast.success(`${cls.name} criada!`)
     setSaving(false)
   }
@@ -199,9 +214,26 @@ export default function LibraryClient({ classes: initialClasses, isAdmin }: Prop
               className="w-full px-3 py-2 rounded-lg bg-muted border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
               onKeyDown={(e) => e.key === 'Enter' && saveNewClass()}
             />
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <div
+                onClick={() => setNewClassIsTimed((v) => !v)}
+                className={[
+                  'relative w-9 h-5 rounded-full transition-colors',
+                  newClassIsTimed ? 'bg-primary' : 'bg-muted-foreground/30',
+                ].join(' ')}
+              >
+                <span className={[
+                  'absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform',
+                  newClassIsTimed ? 'translate-x-4' : '',
+                ].join(' ')} />
+              </div>
+              <span className="text-sm text-muted-foreground flex items-center gap-1">
+                <Timer className="w-3.5 h-3.5" /> Baseado em tempo
+              </span>
+            </label>
             <div className="flex gap-2 justify-end">
               <button
-                onClick={() => { setShowNewClass(false); setNewClassName(''); setNewClassVariant('') }}
+                onClick={() => { setShowNewClass(false); setNewClassName(''); setNewClassVariant(''); setNewClassIsTimed(false) }}
                 className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm text-muted-foreground hover:bg-muted transition-colors"
               >
                 <X className="w-3.5 h-3.5" /> Cancelar
@@ -225,15 +257,32 @@ export default function LibraryClient({ classes: initialClasses, isAdmin }: Prop
         filtered.map((cls) => (
           <div key={cls.id} className="space-y-2">
             <div className="flex items-center justify-between">
-              <h2 className="font-semibold">{cls.name}</h2>
-              {isAdmin && addingToClass !== cls.id && (
-                <button
-                  onClick={() => startAddVariant(cls.id)}
-                  className="text-muted-foreground hover:text-primary transition-colors"
-                  aria-label={`Adicionar variante a ${cls.name}`}
-                >
-                  <Plus className="w-4 h-4" />
-                </button>
+              <div className="flex items-center gap-2">
+                <h2 className="font-semibold">{cls.name}</h2>
+                {cls.is_timed && (
+                  <span className="inline-flex items-center gap-1 text-xs text-muted-foreground border rounded-full px-2 py-0.5">
+                    <Timer className="w-3 h-3" /> tempo
+                  </span>
+                )}
+              </div>
+              {isAdmin && (
+                deleteMode ? (
+                  <button
+                    onClick={() => deleteClass(cls.id, cls.name)}
+                    className="text-destructive hover:text-destructive/70 transition-colors"
+                    aria-label={`Remover classe ${cls.name}`}
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                ) : addingToClass !== cls.id && (
+                  <button
+                    onClick={() => startAddVariant(cls.id)}
+                    className="text-muted-foreground hover:text-primary transition-colors"
+                    aria-label={`Adicionar variante a ${cls.name}`}
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                )
               )}
             </div>
 

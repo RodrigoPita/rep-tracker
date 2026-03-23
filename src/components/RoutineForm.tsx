@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
@@ -27,13 +27,16 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical, Timer } from 'lucide-react'
+import { GripVertical, Timer, X } from 'lucide-react'
 
 type RowDraft = {
+  id?: string           // routine_exercise id — present for existing rows, absent for newly added ones
   exercise_id: string
   label: string
+  is_timed: boolean
   sets: number
   target_reps: number
+  target_seconds: number | null
   rest_seconds: number | null
   display_order: number
 }
@@ -56,14 +59,13 @@ function normalize(str: string) {
 type SortableRowProps = {
   row: RowDraft
   index: number
-  total: number
   onUpdate: (index: number, field: 'sets' | 'target_reps', value: number) => void
+  onUpdateTargetSeconds: (index: number, value: number | null) => void
   onUpdateRest: (index: number, value: number | null) => void
   onRemove: (index: number) => void
-  onMove: (index: number, direction: -1 | 1) => void
 }
 
-function SortableRow({ row, index, total, onUpdate, onUpdateRest, onRemove, onMove }: SortableRowProps) {
+function SortableRow({ row, index, onUpdate, onUpdateTargetSeconds, onUpdateRest, onRemove }: SortableRowProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: row.exercise_id,
   })
@@ -79,7 +81,7 @@ function SortableRow({ row, index, total, onUpdate, onUpdateRest, onRemove, onMo
     <div ref={setNodeRef} style={style}>
       <Card>
         <CardContent className="py-3 space-y-2">
-          {/* Row 1: drag handle + exercise name */}
+          {/* Row 1: drag handle + exercise name + remove */}
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -90,10 +92,23 @@ function SortableRow({ row, index, total, onUpdate, onUpdateRest, onRemove, onMo
             >
               <GripVertical className="w-4 h-4" />
             </button>
-            <span className="font-medium text-sm">{row.label}</span>
+            <span className="font-medium text-sm flex-1">{row.label}</span>
+            {row.is_timed && (
+              <span className="inline-flex items-center gap-1 text-xs text-muted-foreground border rounded-full px-1.5 py-0.5">
+                <Timer className="w-3 h-3" /> tempo
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => onRemove(index)}
+              className="text-muted-foreground/50 hover:text-destructive transition-colors shrink-0"
+              aria-label="Remover exercício"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
 
-          {/* Row 2: sets, reps, action buttons */}
+          {/* Row 2: sets, reps/seconds, rest */}
           <div className="flex items-center gap-2 pl-6">
             <div className="flex items-center gap-1">
               <Input
@@ -106,16 +121,33 @@ function SortableRow({ row, index, total, onUpdate, onUpdateRest, onRemove, onMo
               <span className="text-sm text-muted-foreground">séries</span>
             </div>
 
-            <div className="flex items-center gap-1">
-              <Input
-                type="number"
-                value={row.target_reps}
-                onChange={(e) => onUpdate(index, 'target_reps', parseInt(e.target.value) || 1)}
-                className="w-14 h-8 text-center"
-                min={1}
-              />
-              <span className="text-sm text-muted-foreground">reps</span>
-            </div>
+            {row.is_timed ? (
+              <div className="flex items-center gap-1">
+                <Input
+                  type="number"
+                  value={row.target_seconds ?? ''}
+                  onChange={(e) => {
+                    const v = parseInt(e.target.value)
+                    onUpdateTargetSeconds(index, e.target.value === '' || isNaN(v) ? null : v)
+                  }}
+                  placeholder="30"
+                  className="w-14 h-8 text-center"
+                  min={1}
+                />
+                <span className="text-sm text-muted-foreground">seg</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1">
+                <Input
+                  type="number"
+                  value={row.target_reps}
+                  onChange={(e) => onUpdate(index, 'target_reps', parseInt(e.target.value) || 1)}
+                  className="w-14 h-8 text-center"
+                  min={1}
+                />
+                <span className="text-sm text-muted-foreground">reps</span>
+              </div>
+            )}
 
             <div className="flex items-center gap-1">
               <Timer className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
@@ -133,37 +165,6 @@ function SortableRow({ row, index, total, onUpdate, onUpdateRest, onRemove, onMo
               <span className="text-sm text-muted-foreground">s</span>
             </div>
 
-            <div className="flex gap-1 ml-auto">
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-10 w-10 p-0"
-                onClick={() => onMove(index, -1)}
-                disabled={index === 0}
-                aria-label="Mover para cima"
-              >
-                ↑
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-10 w-10 p-0"
-                onClick={() => onMove(index, 1)}
-                disabled={index === total - 1}
-                aria-label="Mover para baixo"
-              >
-                ↓
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-10 w-10 p-0"
-                onClick={() => onRemove(index)}
-                aria-label="Remover exercício"
-              >
-                ✕
-              </Button>
-            </div>
           </div>
         </CardContent>
       </Card>
@@ -175,13 +176,17 @@ export default function RoutineForm({ routineId, allExercises, initialData }: Pr
   const router = useRouter()
   const [name, setName] = useState(initialData?.name ?? '')
   const [rows, setRows] = useState<RowDraft[]>(initialData?.rows ?? [])
+  // Track which routine_exercise IDs existed at load time so we can delete removed ones on save
+  const initialRowIds = useRef<Set<string>>(
+    new Set(initialData?.rows.map((r) => r.id).filter(Boolean) as string[])
+  )
   const [exercises, setExercises] = useState<ExerciseWithClass[]>(allExercises)
   const [search, setSearch] = useState('')
   const [saving, setSaving] = useState(false)
   const [targetSessions, setTargetSessions] = useState<string>('')
 
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   )
 
@@ -203,13 +208,16 @@ export default function RoutineForm({ routineId, allExercises, initialData }: Pr
   )
 
   function addExercise(exercise: ExerciseWithClass) {
+    const isTimed = exercise.exercise_classes.is_timed
     setRows((prev) => [
       ...prev,
       {
         exercise_id: exercise.id,
         label: exerciseLabel(exercise),
+        is_timed: isTimed,
         sets: 3,
         target_reps: 10,
+        target_seconds: isTimed ? 30 : null,
         rest_seconds: null,
         display_order: prev.length,
       },
@@ -252,6 +260,10 @@ export default function RoutineForm({ routineId, allExercises, initialData }: Pr
     setRows((prev) => prev.map((r, i) => (i === index ? { ...r, [field]: value } : r)))
   }
 
+  function updateRowTargetSeconds(index: number, value: number | null) {
+    setRows((prev) => prev.map((r, i) => (i === index ? { ...r, target_seconds: value } : r)))
+  }
+
   function updateRowRest(index: number, value: number | null) {
     setRows((prev) => prev.map((r, i) => (i === index ? { ...r, rest_seconds: value } : r)))
   }
@@ -262,17 +274,7 @@ export default function RoutineForm({ routineId, allExercises, initialData }: Pr
     )
   }
 
-  function moveRow(index: number, direction: -1 | 1) {
-    const next = index + direction
-    if (next < 0 || next >= rows.length) return
-    setRows((prev) => {
-      const updated = [...prev]
-      ;[updated[index], updated[next]] = [updated[next], updated[index]]
-      return updated.map((r, i) => ({ ...r, display_order: i }))
-    })
-  }
-
-  function handleDragEnd(event: DragEndEvent) {
+function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event
     if (!over || active.id === over.id) return
     setRows((prev) => {
@@ -307,21 +309,51 @@ export default function RoutineForm({ routineId, allExercises, initialData }: Pr
       }
     }
 
-    const { error: deleteError } = await supabase.from('routine_exercises').delete().eq('routine_id', rid)
-    if (deleteError) { toast.error('Não foi possível salvar os exercícios.'); setSaving(false); return }
+    const existingRows = rows.filter((r) => r.id)
+    const newRows = rows.filter((r) => !r.id)
+    const keptIds = new Set(existingRows.map((r) => r.id!))
+    const deletedIds = [...initialRowIds.current].filter((id) => !keptIds.has(id))
 
-    if (rows.length > 0) {
-      const { error: insertError } = await supabase.from('routine_exercises').insert(
-        rows.map((r, i) => ({
+    // Soft-delete removed exercises so historical workout_sets keep their FK reference
+    // (hard-deleting would set routine_exercise_id to NULL, wiping exercise names from the calendar)
+    if (deletedIds.length > 0) {
+      const { error } = await supabase.from('routine_exercises')
+        .update({ deleted_at: new Date().toISOString() })
+        .in('id', deletedIds)
+      if (error) { toast.error('Não foi possível salvar os exercícios.'); setSaving(false); return }
+    }
+
+    // Update existing exercises (order may have changed)
+    if (existingRows.length > 0) {
+      const { error } = await supabase.from('routine_exercises').upsert(
+        existingRows.map((r) => ({
+          id: r.id!,
           routine_id: rid!,
           exercise_id: r.exercise_id,
           sets: r.sets,
           target_reps: r.target_reps,
+          target_seconds: r.target_seconds ?? null,
           rest_seconds: r.rest_seconds ?? null,
-          display_order: i,
+          display_order: rows.indexOf(r),
         }))
       )
-      if (insertError) { toast.error('Não foi possível salvar os exercícios.'); setSaving(false); return }
+      if (error) { toast.error('Não foi possível salvar os exercícios.'); setSaving(false); return }
+    }
+
+    // Insert newly added exercises
+    if (newRows.length > 0) {
+      const { error } = await supabase.from('routine_exercises').insert(
+        newRows.map((r) => ({
+          routine_id: rid!,
+          exercise_id: r.exercise_id,
+          sets: r.sets,
+          target_reps: r.target_reps,
+          target_seconds: r.target_seconds ?? null,
+          rest_seconds: r.rest_seconds ?? null,
+          display_order: rows.indexOf(r),
+        }))
+      )
+      if (error) { toast.error('Não foi possível salvar os exercícios.'); setSaving(false); return }
     }
 
     router.push('/routines')
@@ -352,11 +384,10 @@ export default function RoutineForm({ routineId, allExercises, initialData }: Pr
                   key={row.exercise_id}
                   row={row}
                   index={i}
-                  total={rows.length}
                   onUpdate={updateRow}
+                  onUpdateTargetSeconds={updateRowTargetSeconds}
                   onUpdateRest={updateRowRest}
                   onRemove={removeRow}
-                  onMove={moveRow}
                 />
               ))}
             </div>
