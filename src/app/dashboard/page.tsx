@@ -2,6 +2,7 @@ import { supabaseServer } from '@/lib/supabase-server'
 import DashboardClient from '@/components/DashboardClient'
 import type { ExerciseWithClass, WorkoutSession, WorkoutSet } from '@/lib/types'
 import { exerciseLabel } from '@/lib/types'
+import type { UserAchievement } from '@/lib/achievements'
 
 function formatMin(min: number): string {
   if (min < 60) return `${min}min`
@@ -18,6 +19,7 @@ export default async function DashboardPage() {
     { data: sessionsData },
     { data: allSetsData },
     { data: activePeriodData },
+    { data: achievementsData },
   ] = await Promise.all([
     db.from('exercises').select('*, exercise_classes(*)').order('exercise_classes(name)'),
     db.from('workout_sessions').select('*').not('completed_at', 'is', null).order('date'),
@@ -27,6 +29,7 @@ export default async function DashboardPage() {
       .is('completed_at', null)
       .order('created_at', { ascending: false })
       .limit(1),
+    db.from('user_achievements').select('*').order('earned_at', { ascending: false }),
   ])
 
   const exercises = (exercisesData ?? []) as ExerciseWithClass[]
@@ -145,6 +148,8 @@ export default async function DashboardPage() {
       return { label: name, count }
     })
 
+  const achievements = (achievementsData ?? []) as UserAchievement[]
+
   return (
     <DashboardClient
       sessions={completedSessions}
@@ -153,6 +158,7 @@ export default async function DashboardPage() {
       weeklyData={weeklyData}
       topExercises={topExercises}
       timeStats={timeStats}
+      achievements={achievements}
     />
   )
 }

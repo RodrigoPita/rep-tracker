@@ -16,6 +16,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { CheckCircle2, Circle, Timer, Trophy } from 'lucide-react'
+import { checkAndUnlockAchievements } from '@/app/actions/achievements'
 
 type Props = {
   session: WorkoutSessionWithRoutine
@@ -317,6 +318,14 @@ export default function WorkoutClient({ session, initialSets }: Props) {
       activeTime,
     })
     setFinishing(false)
+
+    const unlocked = await checkAndUnlockAchievements()
+    for (const achievement of unlocked) {
+      toast.success(`Conquista desbloqueada: ${achievement.title}`, {
+        description: achievement.description(achievement.metadata),
+        duration: 6000,
+      })
+    }
   }
 
   const completedCount = sets.filter((s) => s.completed).length

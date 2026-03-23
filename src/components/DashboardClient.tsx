@@ -1,9 +1,17 @@
 'use client'
 
 import { useMemo } from 'react'
-import { Check } from 'lucide-react'
+import Link from 'next/link'
+import { Check, Medal, Star, Trophy, Crown, Target, Dumbbell, Flame, Lock, ChevronRight, type LucideProps } from 'lucide-react'
 import type { WorkoutSession } from '@/lib/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import type { UserAchievement } from '@/lib/achievements'
+import { ACHIEVEMENT_DEFS } from '@/lib/achievements'
+
+type IconComponent = React.FC<LucideProps>
+const ICON_MAP: Record<string, IconComponent> = {
+  Medal, Star, Trophy, Crown, Target, Dumbbell, Flame,
+}
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   CartesianGrid, type BarShapeProps,
@@ -45,10 +53,11 @@ type Props = {
   weeklyData: { week: string; count: number }[]
   topExercises: { label: string; count: number }[]
   timeStats: { avgDuration: string; avgActive: string | null } | null
+  achievements: UserAchievement[]
 }
 
 export default function DashboardClient({
-  sessions, summary, periodProgress, weeklyData, topExercises, timeStats,
+  sessions, summary, periodProgress, weeklyData, topExercises, timeStats, achievements,
 }: Props) {
   const weekStrip = useMemo(() => {
     const now = new Date()
@@ -221,7 +230,74 @@ export default function DashboardClient({
           </CardContent>
         </Card>
       )}
+
+      {/* Achievements */}
+      <AchievementsShelf achievements={achievements} />
     </main>
+  )
+}
+
+function AchievementsShelf({ achievements }: { achievements: UserAchievement[] }) {
+  const earnedById = new Map(achievements.map((a) => [a.achievement_id, a]))
+
+  // Global locked achievements to always show when not yet earned
+  const globalLocked = (['streak_5', 'first_period_completed', 'weight_logged_10'] as const)
+    .filter((key) => !earnedById.has(key))
+
+  if (achievements.length === 0 && globalLocked.length === 0) return null
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xs font-semibold uppercase text-muted-foreground tracking-wide">Conquistas</h2>
+        <Link href="/achievements" className="flex items-center gap-0.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
+          Ver todas <ChevronRight className="w-3 h-3" />
+        </Link>
+      </div>
+      <div className="grid grid-cols-1 gap-2">
+        {/* Earned achievements — newest first */}
+        {achievements.map((a) => {
+          const def = ACHIEVEMENT_DEFS[a.achievement_key]
+          if (!def) return null
+          const Icon = ICON_MAP[def.icon] ?? Medal
+          const dateStr = new Date(a.earned_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+          return (
+            <Card key={a.id} className="border-primary/20">
+              <CardContent className="py-3 px-4 flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                  <Icon className="w-4 h-4 text-primary" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold leading-tight">{def.title}</p>
+                  <p className="text-xs text-muted-foreground leading-snug mt-0.5">{def.description(a.metadata)}</p>
+                </div>
+                <span className="text-xs text-muted-foreground shrink-0">{dateStr}</span>
+              </CardContent>
+            </Card>
+          )
+        })}
+
+        {/* Locked global achievements */}
+        {globalLocked.map((key) => {
+          const def = ACHIEVEMENT_DEFS[key]
+          const Icon = ICON_MAP[def.icon] ?? Medal
+          return (
+            <Card key={key} className="opacity-50">
+              <CardContent className="py-3 px-4 flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-muted/40 flex items-center justify-center shrink-0">
+                  <Icon className="w-4 h-4 text-muted-foreground" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold leading-tight">{def.title}</p>
+                  <p className="text-xs text-muted-foreground leading-snug mt-0.5">{def.description({})}</p>
+                </div>
+                <Lock className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+              </CardContent>
+            </Card>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 

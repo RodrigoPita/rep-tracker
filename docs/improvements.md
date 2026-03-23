@@ -213,14 +213,19 @@
 | 13 | Mobile feel (bottom nav, PWA) | ✅ Done | High | Medium |
 | 14 | Routine periods + session counting | ✅ Done | High | High |
 | 15 | Archive routines | ✅ Done | High | Medium |
-| 16 | Calendar view | ⏳ Pending | High | High |
-| 17 | Dashboard (Analytics v2) | ⏳ Pending | High | High |
-| 18 | Exercise library page | ⏳ Pending | Medium | Medium |
-| 19 | Set & exercise time tracking | ⏳ Pending | Medium | High |
-| 20 | Rest timers | ⏳ Pending | High | High |
-| 21 | Achievements | ⏳ Pending | Medium | High |
-| 22 | Automated tests (Jest) | ⏳ Pending | Medium | High |
-| 23 | README | ⏳ Pending | Low | Low |
+| 16 | Calendar view | ✅ Done | High | High |
+| 17 | Dashboard (Analytics v2) | ✅ Done | High | High |
+| 18 | Exercise library page + admin | ✅ Done | Medium | Medium |
+| 19 | Set & exercise time tracking | ✅ Done | Medium | High |
+| 20 | Rest timers | ✅ Done | High | High |
+| 21 | Timed exercises (is_timed) | ✅ Done | High | High |
+| 22 | Workout history preservation | ✅ Done | High | Medium |
+| 23 | Workout UX (set ordering, blocking) | ✅ Done | Medium | Low |
+| 24 | BRT timezone for session dates | ✅ Done | Medium | Low |
+| 25 | Dashboard time analytics | ✅ Done | Medium | Low |
+| 26 | Achievements | ⏳ Pending | Medium | High |
+| 27 | Automated tests (Jest) | ⏳ Pending | Medium | High |
+| 28 | README | ⏳ Pending | Low | Low |
 
 ---
 
