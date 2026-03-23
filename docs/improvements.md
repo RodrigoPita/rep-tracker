@@ -182,15 +182,17 @@
 
 ---
 
-## 25. Achievements
-- Unlock badges for hitting milestones, e.g.:
-  - Complete 10 / 50 / 100 / 500 sessions of a given exercise
-  - Finish your first full routine period (e.g. 45 sessions)
-  - Log weight on 10 sets
-  - Complete a workout 5 days in a row (streak)
-- Achievement feed or shelf on the Dashboard
-- Achievements are stored in Supabase (`user_achievements` table) so they persist across devices
-- Notifications / toasts on unlock ("Conquista desbloqueada!")
+## 25. Achievements ✅
+- 7 achievement types implemented:
+  - Exercise set milestones: 500 / 2.000 / 5.000 / 10.000 sets per exercise class
+  - First full routine period completed
+  - Weight logged on 10 sets
+  - 5-day training streak (best ever)
+- `user_achievements` table in Supabase (migration 010) with RLS
+- Checked and unlocked via server action after each workout is finished; toast shown per unlock
+- Dashboard shelf shows earned badges + locked global achievements + "Ver todas" link
+- `/achievements` page shows full list: earned with date, locked globals, exercise milestone tiers per class with progress bars
+- New exercise classes appear in `/achievements` immediately on creation
 
 ---
 
@@ -213,14 +215,19 @@
 | 13 | Mobile feel (bottom nav, PWA) | ✅ Done | High | Medium |
 | 14 | Routine periods + session counting | ✅ Done | High | High |
 | 15 | Archive routines | ✅ Done | High | Medium |
-| 16 | Calendar view | ⏳ Pending | High | High |
-| 17 | Dashboard (Analytics v2) | ⏳ Pending | High | High |
-| 18 | Exercise library page | ⏳ Pending | Medium | Medium |
-| 19 | Set & exercise time tracking | ⏳ Pending | Medium | High |
-| 20 | Rest timers | ⏳ Pending | High | High |
-| 21 | Achievements | ⏳ Pending | Medium | High |
-| 22 | Automated tests (Jest) | ⏳ Pending | Medium | High |
-| 23 | README | ⏳ Pending | Low | Low |
+| 16 | Calendar view | ✅ Done | High | High |
+| 17 | Dashboard (Analytics v2) | ✅ Done | High | High |
+| 18 | Exercise library page + admin | ✅ Done | Medium | Medium |
+| 19 | Set & exercise time tracking | ✅ Done | Medium | High |
+| 20 | Rest timers | ✅ Done | High | High |
+| 21 | Timed exercises (is_timed) | ✅ Done | High | High |
+| 22 | Workout history preservation | ✅ Done | High | Medium |
+| 23 | Workout UX (set ordering, blocking) | ✅ Done | Medium | Low |
+| 24 | BRT timezone for session dates | ✅ Done | Medium | Low |
+| 25 | Dashboard time analytics | ✅ Done | Medium | Low |
+| 26 | Achievements | ✅ Done | Medium | High |
+| 27 | Automated tests (Jest) | ⏳ Pending | Medium | High |
+| 28 | README | ⏳ Pending | Low | Low |
 
 ---
 

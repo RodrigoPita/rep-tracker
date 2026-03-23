@@ -46,7 +46,7 @@ export default function NavClient({ userEmail, displayName, isAdmin }: Props) {
         <div className="py-3 flex items-center justify-between">
           <span className="text-xl font-bold tracking-tight text-primary">Rep Tracker</span>
           <div className="flex items-center gap-2">
-            {isAdmin && (
+            {userEmail && isAdmin && (
               <span className="flex items-center gap-1 text-xs font-medium text-primary bg-primary/10 px-2 py-0.5 rounded-full">
                 <ShieldCheck className="w-3 h-3" />
                 Admin
