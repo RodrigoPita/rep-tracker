@@ -98,7 +98,7 @@ function RestTimer({
   )
 }
 
-// Live elapsed timer shown on an active (started) set
+// Live elapsed timer shown on an active (started) rep-based set
 function SetTimer({ startedAt }: { startedAt: Date }) {
   const [elapsed, setElapsed] = useState(0)
   useEffect(() => {
@@ -111,6 +111,26 @@ function SetTimer({ startedAt }: { startedAt: Date }) {
   return (
     <span className="text-xs font-mono text-primary tabular-nums">
       {formatSeconds(elapsed)}
+    </span>
+  )
+}
+
+// Countdown shown on an active timed set; goes red when overtime
+function TimedSetCountdown({ targetSeconds, startedAt }: { targetSeconds: number; startedAt: Date }) {
+  const [elapsed, setElapsed] = useState(0)
+  useEffect(() => {
+    const id = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - startedAt.getTime()) / 1000))
+    }, 1000)
+    return () => clearInterval(id)
+  }, [startedAt])
+
+  const remaining = targetSeconds - elapsed
+  const overtime = remaining < 0
+
+  return (
+    <span className={['font-mono font-semibold tabular-nums text-sm', overtime ? 'text-red-500' : 'text-primary'].join(' ')}>
+      {overtime ? `+${formatSeconds(remaining)}` : formatSeconds(remaining)}
     </span>
   )
 }
@@ -132,7 +152,7 @@ export default function WorkoutClient({ session, initialSets }: Props) {
     Object.fromEntries(
       Object.entries(
         initialSets.reduce<Record<string, boolean>>((acc, s) => {
-          if (s.weight_kg != null) acc[s.routine_exercise_id] = true
+          if (s.weight_kg != null && s.routine_exercise_id) acc[s.routine_exercise_id] = true
           return acc
         }, {})
       )
@@ -159,8 +179,13 @@ export default function WorkoutClient({ session, initialSets }: Props) {
   }
 
   async function completeSet(setId: string, targetReps: number) {
+    const set = sets.find((s) => s.id === setId)
+    const isTimed = set?.routine_exercises?.exercises?.exercise_classes?.is_timed
+    const activeStart = activeSetTimes[setId]
     const parsed = repOverrides[setId] ? parseInt(repOverrides[setId]) : targetReps
-    const actualReps = Math.max(1, isNaN(parsed) ? targetReps : parsed)
+    const actualReps = isTimed && activeStart
+      ? Math.max(1, Math.floor((Date.now() - activeStart.getTime()) / 1000))
+      : Math.max(1, isNaN(parsed) ? targetReps : parsed)
     const weightStr = weightOverrides[setId]
     const weight_kg = weightStr ? parseFloat(weightStr) || null : null
     const completedAt = new Date().toISOString()
@@ -191,7 +216,6 @@ export default function WorkoutClient({ session, initialSets }: Props) {
 
     // Start rest timer if this exercise has rest_seconds configured,
     // but not after the last set of the last exercise
-    const set = sets.find((s) => s.id === setId)
     const restSeconds = set?.routine_exercises?.rest_seconds
     if (restSeconds && restSeconds > 0) {
       const maxOrder = Math.max(...sets.map((s) => s.routine_exercises.display_order))
@@ -301,7 +325,7 @@ export default function WorkoutClient({ session, initialSets }: Props) {
   const allDone = completedCount === totalCount && totalCount > 0
 
   const grouped = sets.reduce<Record<string, WorkoutSetWithExercise[]>>((acc, set) => {
-    const key = set.routine_exercise_id
+    const key = set.routine_exercise_id ?? 'unknown'
     if (!acc[key]) acc[key] = []
     acc[key].push(set)
     return acc
@@ -383,10 +407,10 @@ export default function WorkoutClient({ session, initialSets }: Props) {
                 <div className="flex items-center gap-2 shrink-0">
                   {!groupDone && (
                     <button
-                      onClick={() => setWeightExpanded((prev) => ({ ...prev, [exerciseSets[0].routine_exercise_id]: !prev[exerciseSets[0].routine_exercise_id] }))}
+                      onClick={() => { const k = exerciseSets[0].routine_exercise_id ?? 'unknown'; setWeightExpanded((prev) => ({ ...prev, [k]: !prev[k] })) }}
                       className="text-xs text-muted-foreground hover:text-foreground transition-colors"
                     >
-                      {weightExpanded[exerciseSets[0].routine_exercise_id] ? '− carga' : '＋ carga'}
+                      {weightExpanded[exerciseSets[0].routine_exercise_id ?? 'unknown'] ? '− carga' : '＋ carga'}
                     </button>
                   )}
                   {groupDone && <CheckCircle2 className="w-5 h-5 text-green-500" />}
@@ -394,9 +418,12 @@ export default function WorkoutClient({ session, initialSets }: Props) {
               </div>
 
               <div className="divide-y divide-border">
-                {exerciseSets.map((set) => {
+                {exerciseSets.map((set, setIndex) => {
                   const isActive = !!activeSetTimes[set.id]
                   const activeStart = activeSetTimes[set.id]
+                  const hasActiveSet = Object.keys(activeSetTimes).length > 0
+                  const prevIncomplete = exerciseSets.slice(0, setIndex).some(s => !s.completed)
+                  const isBlocked = !set.completed && !isActive && (hasActiveSet || prevIncomplete)
 
                   return (
                     <div key={set.id}>
@@ -407,6 +434,7 @@ export default function WorkoutClient({ session, initialSets }: Props) {
                           : 'bg-card',
                       ].join(' ')}>
                         <button
+                          disabled={isBlocked}
                           onClick={() => {
                             if (set.completed) {
                               undoSet(set.id)
@@ -416,7 +444,10 @@ export default function WorkoutClient({ session, initialSets }: Props) {
                               startSet(set.id)
                             }
                           }}
-                          className="shrink-0 transition-transform active:scale-90"
+                          className={[
+                            'shrink-0 transition-transform active:scale-90',
+                            isBlocked ? 'opacity-30 cursor-not-allowed' : '',
+                          ].join(' ')}
                           aria-label={set.completed ? 'Desfazer série' : isActive ? 'Completar série' : 'Iniciar série'}
                         >
                           {set.completed ? (
@@ -424,7 +455,7 @@ export default function WorkoutClient({ session, initialSets }: Props) {
                           ) : isActive ? (
                             <CheckCircle2 className="w-6 h-6 text-primary" />
                           ) : (
-                            <Circle className="w-6 h-6 text-muted-foreground/30 hover:text-primary/60 transition-colors" />
+                            <Circle className="w-6 h-6 text-muted-foreground/30" />
                           )}
                         </button>
 
@@ -432,7 +463,7 @@ export default function WorkoutClient({ session, initialSets }: Props) {
                           S{set.set_number}
                         </span>
 
-                        {weightExpanded[set.routine_exercise_id] && (
+                        {weightExpanded[set.routine_exercise_id ?? 'unknown'] && (
                           <>
                             <Input
                               type="number"
@@ -454,26 +485,48 @@ export default function WorkoutClient({ session, initialSets }: Props) {
                           </>
                         )}
 
-                        <Input
-                          type="number"
-                          placeholder={String(set.target_reps)}
-                          value={repOverrides[set.id] ?? (set.actual_reps != null ? String(set.actual_reps) : '')}
-                          onChange={(e) => {
-                            const val = e.target.value
-                            if (val === '' || parseInt(val) >= 1) {
-                              setRepOverrides((prev) => ({ ...prev, [set.id]: val }))
-                            }
-                          }}
-                          disabled={set.completed}
-                          className={[
-                            'w-14 h-9 text-center font-semibold tabular-nums shrink-0 sm:w-16',
-                            set.completed ? 'text-muted-foreground line-through' : '',
-                          ].join(' ')}
-                        />
-                        <span className="text-sm text-muted-foreground shrink-0">reps</span>
+                        {set.routine_exercises.exercises.exercise_classes.is_timed ? (
+                          // Timed exercise: show countdown while active, elapsed when done, target when pending
+                          <div className="flex items-center gap-1.5 ml-1">
+                            {isActive && activeStart ? (
+                              <TimedSetCountdown
+                                targetSeconds={set.routine_exercises.target_seconds ?? 30}
+                                startedAt={activeStart}
+                              />
+                            ) : set.completed ? (
+                              <span className="text-sm font-mono font-semibold tabular-nums text-muted-foreground">
+                                {formatSeconds(set.actual_reps ?? 0)}
+                              </span>
+                            ) : (
+                              <span className="text-sm font-mono tabular-nums text-muted-foreground">
+                                {formatSeconds(set.routine_exercises.target_seconds ?? 30)}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <>
+                            <Input
+                              type="number"
+                              placeholder={String(set.target_reps)}
+                              value={repOverrides[set.id] ?? (set.actual_reps != null ? String(set.actual_reps) : '')}
+                              onChange={(e) => {
+                                const val = e.target.value
+                                if (val === '' || parseInt(val) >= 1) {
+                                  setRepOverrides((prev) => ({ ...prev, [set.id]: val }))
+                                }
+                              }}
+                              disabled={set.completed}
+                              className={[
+                                'w-14 h-9 text-center font-semibold tabular-nums shrink-0 sm:w-16',
+                                set.completed ? 'text-muted-foreground line-through' : '',
+                              ].join(' ')}
+                            />
+                            <span className="text-sm text-muted-foreground shrink-0">reps</span>
+                          </>
+                        )}
 
-                        {/* Live timer on active set */}
-                        {isActive && activeStart && (
+                        {/* Live elapsed timer on active rep-based set */}
+                        {isActive && activeStart && !set.routine_exercises.exercises.exercise_classes.is_timed && (
                           <span className="ml-auto">
                             <SetTimer startedAt={activeStart} />
                           </span>

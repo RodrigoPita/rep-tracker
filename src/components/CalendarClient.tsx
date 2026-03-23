@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import type { CalendarSession } from '@/lib/types'
+import { todayBRT } from '@/lib/utils'
 
 type Props = { sessions: CalendarSession[] }
 
@@ -13,9 +14,10 @@ const MONTHS_PT = [
 ]
 
 export default function CalendarClient({ sessions }: Props) {
-  const today = new Date()
-  const [year, setYear] = useState(today.getFullYear())
-  const [month, setMonth] = useState(today.getMonth())
+  const todayStr = todayBRT()
+  const [todayYear, todayMonth] = todayStr.split('-').map(Number)
+  const [year, setYear] = useState(todayYear)
+  const [month, setMonth] = useState(todayMonth - 1)  // month is 0-indexed
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
 
   const sessionsByDate = useMemo(() => {
@@ -29,7 +31,6 @@ export default function CalendarClient({ sessions }: Props) {
 
   const firstDayOfWeek = new Date(year, month, 1).getDay()
   const daysInMonth = new Date(year, month + 1, 0).getDate()
-  const todayStr = today.toISOString().split('T')[0]
 
   function prevMonth() {
     if (month === 0) { setYear(y => y - 1); setMonth(11) }
@@ -49,8 +50,8 @@ export default function CalendarClient({ sessions }: Props) {
   }
 
   function goToToday() {
-    setYear(today.getFullYear())
-    setMonth(today.getMonth())
+    setYear(todayYear)
+    setMonth(todayMonth - 1)
     setSelectedDate(null)
   }
 
@@ -161,23 +162,26 @@ function DayDetail({ date, sessions }: { date: string; sessions: CalendarSession
 }
 
 function SessionDetail({ session }: { session: CalendarSession }) {
+  // Only include sets whose exercise still exists (routine_exercise_id not null)
+  const trackedSets = session.workout_sets.filter((s) => s.routine_exercises != null)
+
   // Group sets by routine_exercise_id to show one row per exercise
-  const byRoutineExercise: Record<string, typeof session.workout_sets> = {}
-  for (const set of session.workout_sets) {
-    const key = set.routine_exercise_id
+  const byRoutineExercise: Record<string, typeof trackedSets> = {}
+  for (const set of trackedSets) {
+    const key = set.routine_exercise_id!
     if (!byRoutineExercise[key]) byRoutineExercise[key] = []
     byRoutineExercise[key].push(set)
   }
 
-  // Sort by set_number within each group, then sort groups by display_order
+  // Sort groups by display_order
   const exerciseGroups = Object.values(byRoutineExercise).sort(
     (a, b) =>
-      (a[0].routine_exercises.display_order ?? 0) -
-      (b[0].routine_exercises.display_order ?? 0)
+      (a[0].routine_exercises!.display_order ?? 0) -
+      (b[0].routine_exercises!.display_order ?? 0)
   )
 
-  const completedCount = session.workout_sets.filter(s => s.completed).length
-  const totalCount = session.workout_sets.length
+  const completedCount = trackedSets.filter(s => s.completed).length
+  const totalCount = trackedSets.length
 
   return (
     <div className="bg-card rounded-xl border border-border p-4 space-y-3">
@@ -189,15 +193,22 @@ function SessionDetail({ session }: { session: CalendarSession }) {
       {exerciseGroups.length > 0 && (
         <div className="space-y-1.5 border-t border-border pt-3">
           {exerciseGroups.map(sets => {
-            const ex = sets[0].routine_exercises.exercises
+            const re = sets[0].routine_exercises!
+            const ex = re.exercises
             const label = ex.variant
               ? `${ex.exercise_classes.name} — ${ex.variant}`
               : ex.exercise_classes.name
             const completed = sets.filter(s => s.completed)
             const hasWeight = completed.some(s => s.weight_kg != null)
 
+            const isTimed = ex.exercise_classes.is_timed
             const repsSummary = (() => {
               if (completed.length === 0) return null
+              if (isTimed) {
+                const allSecs = completed.map(s => s.actual_reps != null ? `${s.actual_reps}s` : '?')
+                const allSame = allSecs.every(v => v === allSecs[0])
+                return allSame ? `${completed.length} × ${allSecs[0]}` : allSecs.join(', ')
+              }
               const allReps = completed.map(s => s.actual_reps ?? '?')
               const allSame = allReps.every(r => r === allReps[0])
               if (allSame) {

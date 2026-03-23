@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
+import { todayBRT } from '@/lib/utils'
 import type { Routine, RoutinePeriod, WorkoutSession } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -32,7 +33,7 @@ export default function HomeClient({ routines, activeSessions, periods, sessionC
     const { data: { user } } = await supabase.auth.getUser()
     const { data, error } = await supabase
       .from('workout_sessions')
-      .insert({ routine_id: routineId, date: new Date().toISOString().split('T')[0], user_id: user?.id })
+      .insert({ routine_id: routineId, date: todayBRT(), user_id: user?.id })
       .select()
       .single()
 
@@ -46,6 +47,7 @@ export default function HomeClient({ routines, activeSessions, periods, sessionC
       .from('routine_exercises')
       .select('*')
       .eq('routine_id', routineId)
+      .is('deleted_at', null)
       .order('display_order')
 
     if (reError) {

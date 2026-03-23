@@ -1,6 +1,7 @@
 export type ExerciseClass = {
   id: string
   name: string
+  is_timed: boolean
   created_at: string
 }
 
@@ -34,6 +35,7 @@ export type RoutineExercise = {
   exercise_id: string
   sets: number
   target_reps: number
+  target_seconds: number | null
   display_order: number
   rest_seconds: number | null
 }
@@ -49,7 +51,7 @@ export type WorkoutSession = {
 export type WorkoutSet = {
   id: string
   session_id: string
-  routine_exercise_id: string
+  routine_exercise_id: string | null
   set_number: number
   target_reps: number
   actual_reps: number | null
@@ -82,9 +84,9 @@ export type WorkoutSessionWithRoutine = WorkoutSession & {
 export type CalendarSession = WorkoutSession & {
   routines: Routine
   workout_sets: Array<WorkoutSet & {
-    routine_exercises: RoutineExercise & {
-      exercises: Exercise & { exercise_classes: { name: string } }
-    }
+    routine_exercises: (RoutineExercise & {
+      exercises: Exercise & { exercise_classes: { name: string; is_timed: boolean } }
+    }) | null
   }>
 }
 
