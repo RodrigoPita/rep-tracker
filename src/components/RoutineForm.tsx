@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import type { ExerciseWithClass } from '@/lib/types'
 import { exerciseLabel } from '@/lib/types'
+import { normalize } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -52,9 +53,6 @@ type Props = {
   initialData?: RoutineFormInitialData
 }
 
-function normalize(str: string) {
-  return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
-}
 
 type SortableRowProps = {
   row: RowDraft

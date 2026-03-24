@@ -2,6 +2,7 @@ import { supabaseServer } from '@/lib/supabase-server'
 import DashboardClient from '@/components/DashboardClient'
 import type { ExerciseWithClass, WorkoutSession, WorkoutSet } from '@/lib/types'
 import { exerciseLabel } from '@/lib/types'
+import { computeCurrentStreak } from '@/lib/utils'
 import type { UserAchievement } from '@/lib/achievements'
 
 function formatMin(min: number): string {
@@ -80,20 +81,11 @@ export default async function DashboardPage() {
   const mostTrainedEx = exercises.find((e) => e.id === mostTrainedId)
   const mostTrained = mostTrainedEx ? exerciseLabel(mostTrainedEx) : '—'
 
-  // Streak
-  const sessionDatesUniq = [...new Set(completedSessions.map((s) => s.date))].sort().reverse()
-  let streak = 0
   const now = new Date()
-  const todayStr = now.toISOString().split('T')[0]
-  let cursor = todayStr
-  for (const date of sessionDatesUniq) {
-    if (date === cursor) {
-      streak++
-      const d = new Date(cursor + 'T00:00:00')
-      d.setDate(d.getDate() - 1)
-      cursor = d.toISOString().split('T')[0]
-    } else break
-  }
+
+  // Streak
+  const sessionDatesUniq = [...new Set(completedSessions.map((s) => s.date))]
+  const streak = computeCurrentStreak(sessionDatesUniq)
 
   // Active routine period progress
   const activePeriod = (activePeriodData as unknown as ({ routine_id: string; target_sessions: number; started_at: string; routines: { name: string } }[]))?.[0] ?? null
