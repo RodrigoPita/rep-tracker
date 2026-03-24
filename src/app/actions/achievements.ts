@@ -2,6 +2,7 @@
 
 import { supabaseServer } from '@/lib/supabase-server'
 import { ACHIEVEMENT_DEFS, EXERCISE_TIERS, type AchievementKey, type AchievementDef } from '@/lib/achievements'
+import { computeMaxStreak } from '@/lib/utils'
 
 type EarnedCandidate = {
   achievement_key: AchievementKey
@@ -115,23 +116,8 @@ export async function checkAndUnlockAchievements(): Promise<UnlockedAchievement[
     .order('date', { ascending: true })
 
   if (sessionDates && sessionDates.length >= 5) {
-    const uniqueDates = [...new Set(sessionDates.map((s: { date: string }) => s.date))].sort()
-    let maxStreak = 1
-    let currentStreak = 1
-
-    for (let i = 1; i < uniqueDates.length; i++) {
-      const prev = new Date(uniqueDates[i - 1])
-      const curr = new Date(uniqueDates[i])
-      const diffDays = (curr.getTime() - prev.getTime()) / (1000 * 60 * 60 * 24)
-
-      if (diffDays === 1) {
-        currentStreak++
-        maxStreak = Math.max(maxStreak, currentStreak)
-      } else {
-        currentStreak = 1
-      }
-    }
-
+    const uniqueDates = [...new Set(sessionDates.map((s: { date: string }) => s.date))]
+    const maxStreak = computeMaxStreak(uniqueDates)
     if (maxStreak >= 5) {
       candidates.push({
         achievement_key: 'streak_5',

@@ -5,6 +5,13 @@ export type ExerciseClass = {
   created_at: string
 }
 
+export type ExerciseClassWithVariants = {
+  id: string
+  name: string
+  is_timed: boolean
+  exercises: { id: string; variant: string }[]
+}
+
 export type Exercise = {
   id: string
   class_id: string

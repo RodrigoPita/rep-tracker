@@ -1,12 +1,6 @@
 import { supabaseServer } from '@/lib/supabase-server'
 import LibraryClient from '@/components/LibraryClient'
-
-export type ExerciseClass = {
-  id: string
-  name: string
-  is_timed: boolean
-  exercises: { id: string; variant: string }[]
-}
+import type { ExerciseClassWithVariants } from '@/lib/types'
 
 export default async function LibraryPage() {
   const db = await supabaseServer()
@@ -20,7 +14,7 @@ export default async function LibraryPage() {
 
   const isAdmin = user?.id === process.env.ADMIN_USER_ID
 
-  const classes: ExerciseClass[] = (data ?? []).map((cls) => ({
+  const classes: ExerciseClassWithVariants[] = (data ?? []).map((cls) => ({
     id: cls.id,
     name: cls.name,
     is_timed: cls.is_timed ?? false,

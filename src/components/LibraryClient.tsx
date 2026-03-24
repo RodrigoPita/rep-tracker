@@ -5,16 +5,14 @@ import { Plus, X, Check, Search, Trash2, Timer } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import type { ExerciseClass } from '@/app/library/page'
+import type { ExerciseClassWithVariants as ExerciseClass } from '@/lib/types'
+import { normalize } from '@/lib/utils'
 
 type Props = {
   classes: ExerciseClass[]
   isAdmin: boolean
 }
 
-function normalize(s: string) {
-  return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
-}
 
 export default function LibraryClient({ classes: initialClasses, isAdmin }: Props) {
   const [classes, setClasses] = useState(initialClasses)
