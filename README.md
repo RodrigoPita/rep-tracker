@@ -16,30 +16,30 @@ A personal fitness tracker for logging bodyweight workouts, tracking progress ov
 
 ## ✨ Features
 
-* **📋 Routine Builder** — Create named workout routines with exercises, sets, reps, and rest timers; reorder via drag-and-drop
-* **⏱️ Active Workout** — Live checklist with enforced set order, rest countdowns, and support for both rep-based and timed exercises
-* **📅 Calendar View** — Monthly grid highlighting training days; tap any day to see a full breakdown of exercises, sets, reps, and weight
-* **📊 Dashboard** — Weekly activity strip, routine period progress wheel, streak counter, average session duration, and volume charts
-* **🏆 Achievements** — Milestone badges unlocked on workout completion; visible on the dashboard shelf and a dedicated achievements page
-* **📚 Exercise Library** — Browse all exercise classes and variants; admin controls to add, remove, and configure exercises
-* **🎯 Routine Periods** — Set a target number of sessions for a routine and track progress toward completing it
-* **🔒 Auth & RLS** — Google OAuth login; Row Level Security ensures all data is scoped to the authenticated user
-* **🌗 Dark / Light Mode** — System-aware theme with manual toggle
-* **📱 PWA** — Installable on mobile with bottom navigation, safe-area insets, and a home screen manifest
+- **📋 Routine Builder** — Create named workout routines with exercises, sets, reps, and rest timers; reorder via drag-and-drop
+- **⏱️ Active Workout** — Live checklist with enforced set order, rest countdowns, and support for both rep-based and timed exercises
+- **📅 Calendar View** — Monthly grid highlighting training days; tap any day to see a full breakdown of exercises, sets, reps, and weight
+- **📊 Dashboard** — Weekly activity strip, routine period progress wheel, streak counter, average session duration, and volume charts
+- **🏆 Achievements** — Milestone badges unlocked on workout completion; visible on the dashboard shelf and a dedicated achievements page
+- **📚 Exercise Library** — Browse all exercise classes and variants; admin controls to add, remove, and configure exercises
+- **🎯 Routine Periods** — Set a target number of sessions for a routine and track progress toward completing it
+- **🔒 Auth & RLS** — Google OAuth login; Row Level Security ensures all data is scoped to the authenticated user
+- **🌗 Dark / Light Mode** — System-aware theme with manual toggle
+- **📱 PWA** — Installable on mobile with bottom navigation, safe-area insets, and a home screen manifest
 
 ---
 
 ## 🛠️ Tech Stack
 
-* **Next.js 15** — App Router with server components for SSR data fetching and zero client-side loading flash
-* **TypeScript** — Full type coverage across the stack
-* **Supabase** — PostgreSQL database, Auth (Google OAuth), and Row Level Security; hosted in São Paulo
-* **Tailwind CSS v4 + shadcn/ui** — Utility-first styling with a consistent component library
-* **Recharts** — Volume and activity charts on the dashboard
-* **@dnd-kit** — Drag-and-drop reordering in the routine builder
-* **Sonner** — Toast notifications for errors and achievement unlocks
-* **next-themes** — SSR-safe dark/light mode switching
-* **Vercel** — Deployment with functions co-located in São Paulo (`gru1`)
+- **Next.js 15** — App Router with server components for SSR data fetching and zero client-side loading flash
+- **TypeScript** — Full type coverage across the stack
+- **Supabase** — PostgreSQL database, Auth (Google OAuth), and Row Level Security; hosted in São Paulo
+- **Tailwind CSS v4 + shadcn/ui** — Utility-first styling with a consistent component library
+- **Recharts** — Volume and activity charts on the dashboard
+- **@dnd-kit** — Drag-and-drop reordering in the routine builder
+- **Sonner** — Toast notifications for errors and achievement unlocks
+- **next-themes** — SSR-safe dark/light mode switching
+- **Vercel** — Deployment with functions co-located in São Paulo (`gru1`)
 
 ---
 
@@ -47,18 +47,20 @@ A personal fitness tracker for logging bodyweight workouts, tracking progress ov
 
 ### Prerequisites
 
-* [Node.js](https://nodejs.org/) v22 (`nvm use 22`)
-* A [Supabase](https://supabase.com/) project (free tier works)
+- [Node.js](https://nodejs.org/) v22 (`nvm use 22`)
+- A [Supabase](https://supabase.com/) project (free tier works)
 
 ### Installation
 
 1. **Clone the repository:**
+
    ```bash
    git clone https://github.com/RodrigoPita/rep-tracker.git
    cd rep-tracker
    ```
 
 2. **Install dependencies:**
+
    ```bash
    npm install
    ```
@@ -66,6 +68,7 @@ A personal fitness tracker for logging bodyweight workouts, tracking progress ov
 3. **Configure environment variables:**
 
    Copy the example file and fill in your values:
+
    ```bash
    cp .env.local.example .env.local
    ```
@@ -79,67 +82,18 @@ A personal fitness tracker for logging bodyweight workouts, tracking progress ov
 4. **Run the database migrations:**
 
    In the [Supabase SQL editor](https://supabase.com/dashboard), run each file in `supabase/migrations/` in order (`001` → `010`), or use the Supabase CLI:
+
    ```bash
    supabase db push
    ```
 
 5. **Start the development server:**
+
    ```bash
    npm run dev
    ```
 
    Open [http://localhost:3000](http://localhost:3000).
-
----
-
-## 📁 Project Structure
-
-```
-rep-tracker/
-├── docs/                          # Project documentation
-│   ├── overview.md                # Index and project overview
-│   ├── architecture.md            # Patterns, conventions, auth & data flow
-│   ├── database.md                # Full schema and migration history
-│   └── improvements.md            # Feature backlog and status
-├── supabase/
-│   └── migrations/                # SQL migrations (001–010)
-├── src/
-│   ├── app/                       # Next.js App Router
-│   │   ├── layout.tsx             # Root layout (nav, theme, toaster)
-│   │   ├── page.tsx               # Home — start or resume a workout
-│   │   ├── workout/[sessionId]/   # Active workout checklist
-│   │   ├── routines/              # Routine list, create, edit
-│   │   ├── calendar/              # Monthly calendar view
-│   │   ├── dashboard/             # Stats, charts, achievements shelf
-│   │   ├── library/               # Exercise class browser
-│   │   ├── achievements/          # Full achievements list
-│   │   ├── login/                 # Google OAuth login page
-│   │   ├── auth/callback/         # OAuth redirect handler
-│   │   └── actions/               # Server actions (achievements check)
-│   ├── components/                # UI components
-│   │   ├── ui/                    # shadcn/ui primitives
-│   │   ├── NavBar.tsx             # Server component — fetches user
-│   │   ├── NavClient.tsx          # Client component — nav interactions
-│   │   ├── WorkoutClient.tsx      # Active workout UI
-│   │   ├── DashboardClient.tsx    # Dashboard UI
-│   │   ├── CalendarClient.tsx     # Calendar UI
-│   │   ├── RoutineForm.tsx        # Routine create/edit form
-│   │   ├── RoutinesClient.tsx     # Routine list UI
-│   │   ├── LibraryClient.tsx      # Exercise library UI
-│   │   ├── HomeClient.tsx         # Home page UI
-│   │   ├── PageSkeleton.tsx       # Shared loading skeleton
-│   │   ├── ThemeProvider.tsx      # next-themes wrapper ('use client')
-│   │   └── SonnerToaster.tsx      # Themed toast container ('use client')
-│   └── lib/
-│       ├── supabase.ts            # Supabase browser client (singleton)
-│       ├── supabase-server.ts     # Supabase server client (cookie-aware)
-│       ├── types.ts               # Domain types and joined types
-│       ├── achievements.ts        # Achievement definitions and tiers
-│       └── utils.ts               # cn, todayBRT, normalize, streak utils
-├── .env.local.example
-├── next.config.ts
-└── src/middleware.ts              # Auth guard + session refresh
-```
 
 ---
 
