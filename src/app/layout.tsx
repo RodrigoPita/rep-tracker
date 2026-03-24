@@ -18,6 +18,8 @@ export const metadata: Metadata = {
   },
 }
 
+export const preferredRegion = 'gru1'
+
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,

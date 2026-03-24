@@ -3,20 +3,12 @@ import HomeClient from '@/components/HomeClient'
 
 export default async function HomePage() {
   const db = await supabaseServer()
-  const [{ data: routines }, { data: activeSessions }, { data: periods }] = await Promise.all([
+  const [{ data: routines }, { data: activeSessions }, { data: periods }, { data: completedSessions }] = await Promise.all([
     db.from('routines').select('*').is('archived_at', null).order('created_at'),
     db.from('workout_sessions').select('*').is('completed_at', null).order('created_at', { ascending: false }),
     db.from('routine_periods').select('*').is('completed_at', null),
+    db.from('workout_sessions').select('routine_id, completed_at').not('completed_at', 'is', null),
   ])
-
-  const routineIds = (routines ?? []).map((r) => r.id)
-  const { data: completedSessions } = routineIds.length > 0
-    ? await db
-        .from('workout_sessions')
-        .select('routine_id, completed_at')
-        .in('routine_id', routineIds)
-        .not('completed_at', 'is', null)
-    : { data: [] }
 
   const sessionCounts = (periods ?? []).reduce<Record<string, number>>((acc, p) => {
     acc[p.routine_id] = (completedSessions ?? []).filter(
