@@ -369,6 +369,24 @@ function handleDragEnd(event: DragEndEvent) {
         />
       </div>
 
+      {!routineId && (
+        <div className="space-y-2">
+          <Label htmlFor="target_sessions">Meta de treinos (opcional)</Label>
+          <div className="flex items-center gap-2">
+            <Input
+              id="target_sessions"
+              type="number"
+              value={targetSessions}
+              onChange={(e) => setTargetSessions(e.target.value)}
+              placeholder="ex: 45"
+              className="w-28"
+              min={1}
+            />
+            <span className="text-sm text-muted-foreground">treinos neste ciclo</span>
+          </div>
+        </div>
+      )}
+
       <div className="space-y-2">
         <Label>Exercícios</Label>
         {rows.length === 0 && (
@@ -430,24 +448,6 @@ function handleDragEnd(event: DragEndEvent) {
           </div>
         )}
       </div>
-
-      {!routineId && (
-        <div className="space-y-2">
-          <Label htmlFor="target_sessions">Meta de treinos (opcional)</Label>
-          <div className="flex items-center gap-2">
-            <Input
-              id="target_sessions"
-              type="number"
-              value={targetSessions}
-              onChange={(e) => setTargetSessions(e.target.value)}
-              placeholder="ex: 45"
-              className="w-28"
-              min={1}
-            />
-            <span className="text-sm text-muted-foreground">treinos neste ciclo</span>
-          </div>
-        </div>
-      )}
 
       <div className="flex gap-2 flex-wrap">
         <Button onClick={save} disabled={saving || !name.trim()}>
