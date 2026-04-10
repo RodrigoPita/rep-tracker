@@ -37,15 +37,26 @@ export default async function DashboardPage() {
   const completedSessions: WorkoutSession[] = sessionsData ?? []
   const completedSets: (WorkoutSet & { routine_exercises: { exercise_id: string } })[] = allSetsData ?? []
 
-  // Average session duration
-  const avgDurationMin = completedSessions.length > 0
-    ? Math.round(
-        completedSessions.reduce((sum, s) => {
-          if (!s.completed_at) return sum
-          return sum + (new Date(s.completed_at).getTime() - new Date(s.created_at).getTime()) / 60000
-        }, 0) / completedSessions.length
-      )
-    : null
+  // Average session duration — first set started_at → last set completed_at.
+  // Falls back to session created_at → completed_at for older sessions without per-set tracking.
+  const avgDurationMin = (() => {
+    if (completedSessions.length === 0) return null
+    const durations: number[] = []
+    for (const session of completedSessions) {
+      if (!session.completed_at) continue
+      const sessionSets = completedSets.filter((s) => s.session_id === session.id)
+      const starts = sessionSets.map((s) => s.started_at).filter(Boolean) as string[]
+      const ends = sessionSets.map((s) => s.completed_at).filter(Boolean) as string[]
+      if (starts.length > 0 && ends.length > 0) {
+        const first = Math.min(...starts.map((s) => new Date(s).getTime()))
+        const last = Math.max(...ends.map((e) => new Date(e).getTime()))
+        durations.push((last - first) / 60000)
+      } else {
+        durations.push((new Date(session.completed_at).getTime() - new Date(session.created_at).getTime()) / 60000)
+      }
+    }
+    return durations.length > 0 ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length) : null
+  })()
 
   // Average active time per session (only for sets with started_at tracking)
   const setsBySession = completedSets.reduce<Record<string, WorkoutSet[]>>((acc, s) => {

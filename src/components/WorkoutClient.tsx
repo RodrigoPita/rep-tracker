@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
@@ -17,6 +17,38 @@ import {
 } from '@/components/ui/dialog'
 import { CheckCircle2, Circle, Timer, Trophy } from 'lucide-react'
 import { checkAndUnlockAchievements } from '@/app/actions/achievements'
+
+// ── Audio ─────────────────────────────────────────────────────────────────────
+let audioCtx: AudioContext | null = null
+
+function getAudioCtx(): AudioContext | null {
+  if (typeof window === 'undefined') return null
+  try {
+    if (!audioCtx) audioCtx = new AudioContext()
+    if (audioCtx.state === 'suspended') audioCtx.resume()
+    return audioCtx
+  } catch {
+    return null
+  }
+}
+
+function playBeep() {
+  const ctx = getAudioCtx()
+  if (!ctx) return
+  for (let i = 0; i < 3; i++) {
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+    osc.connect(gain)
+    gain.connect(ctx.destination)
+    osc.frequency.value = 880
+    const t = ctx.currentTime + i * 0.35
+    gain.gain.setValueAtTime(0, t)
+    gain.gain.linearRampToValueAtTime(0.3, t + 0.02)
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.25)
+    osc.start(t)
+    osc.stop(t + 0.25)
+  }
+}
 
 type Props = {
   session: WorkoutSessionWithRoutine
@@ -65,6 +97,8 @@ function RestTimer({
   onEnd: () => void
 }) {
   const [elapsed, setElapsed] = useState(0)
+  const hasBeepedRef = useRef(false)
+
   useEffect(() => {
     const id = setInterval(() => {
       setElapsed(Math.floor((Date.now() - startedAt.getTime()) / 1000))
@@ -73,6 +107,14 @@ function RestTimer({
   }, [startedAt])
 
   const remaining = restSeconds - elapsed
+
+  useEffect(() => {
+    if (remaining <= 0 && !hasBeepedRef.current) {
+      hasBeepedRef.current = true
+      playBeep()
+    }
+  }, [remaining])
+
   const overtime = remaining < 0
 
   return (
@@ -119,6 +161,8 @@ function SetTimer({ startedAt }: { startedAt: Date }) {
 // Countdown shown on an active timed set; goes red when overtime
 function TimedSetCountdown({ targetSeconds, startedAt }: { targetSeconds: number; startedAt: Date }) {
   const [elapsed, setElapsed] = useState(0)
+  const hasBeepedRef = useRef(false)
+
   useEffect(() => {
     const id = setInterval(() => {
       setElapsed(Math.floor((Date.now() - startedAt.getTime()) / 1000))
@@ -127,6 +171,14 @@ function TimedSetCountdown({ targetSeconds, startedAt }: { targetSeconds: number
   }, [startedAt])
 
   const remaining = targetSeconds - elapsed
+
+  useEffect(() => {
+    if (remaining <= 0 && !hasBeepedRef.current) {
+      hasBeepedRef.current = true
+      playBeep()
+    }
+  }, [remaining])
+
   const overtime = remaining < 0
 
   return (
@@ -148,6 +200,17 @@ export default function WorkoutClient({ session, initialSets }: Props) {
   const [activeSetTimes, setActiveSetTimes] = useState<Record<string, Date>>({})
   // Rest state: which set was just completed + when rest started
   const [restState, setRestState] = useState<{ afterSetId: string; startedAt: Date } | null>(null)
+
+  // Unlock AudioContext on first user interaction (required on iOS)
+  useEffect(() => {
+    const unlock = () => getAudioCtx()
+    window.addEventListener('touchstart', unlock, { once: true })
+    window.addEventListener('click', unlock, { once: true })
+    return () => {
+      window.removeEventListener('touchstart', unlock)
+      window.removeEventListener('click', unlock)
+    }
+  }, [])
 
   const [weightExpanded, setWeightExpanded] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(
@@ -231,12 +294,36 @@ export default function WorkoutClient({ session, initialSets }: Props) {
   }
 
   async function endRest(afterSetId: string) {
-    const restEndedAt = new Date().toISOString()
+    const now = new Date()
+    const nowIso = now.toISOString()
+
     setRestState(null)
     setSets((prev) =>
-      prev.map((s) => s.id === afterSetId ? { ...s, rest_ended_at: restEndedAt } : s)
+      prev.map((s) => s.id === afterSetId ? { ...s, rest_ended_at: nowIso } : s)
     )
-    await supabase.from('workout_sets').update({ rest_ended_at: restEndedAt }).eq('id', afterSetId)
+    await supabase.from('workout_sets').update({ rest_ended_at: nowIso }).eq('id', afterSetId)
+
+    // Auto-start the next set
+    const afterSet = sets.find((s) => s.id === afterSetId)
+    if (!afterSet) return
+
+    const nextSet =
+      sets.find(
+        (s) =>
+          s.routine_exercise_id === afterSet.routine_exercise_id &&
+          s.set_number === afterSet.set_number + 1 &&
+          !s.completed,
+      ) ??
+      sets
+        .filter((s) => s.routine_exercises.display_order > afterSet.routine_exercises.display_order && !s.completed)
+        .sort((a, b) => a.routine_exercises.display_order - b.routine_exercises.display_order || a.set_number - b.set_number)[0] ??
+      null
+
+    if (!nextSet) return
+
+    setActiveSetTimes((prev) => ({ ...prev, [nextSet.id]: now }))
+    setSets((prev) => prev.map((s) => s.id === nextSet.id ? { ...s, started_at: nowIso } : s))
+    await supabase.from('workout_sets').update({ started_at: nowIso }).eq('id', nextSet.id)
   }
 
   async function undoSet(setId: string) {
@@ -311,10 +398,15 @@ export default function WorkoutClient({ session, initialSets }: Props) {
       new Date().toISOString()
     ) : null
 
+    const firstStartedAt = completedSets.reduce<string | null>(
+      (min, s) => (s.started_at && (min === null || s.started_at < min) ? s.started_at : min),
+      null,
+    )
+
     setSummary({
       setsCompleted: completedSets.length,
       totalReps: completedSets.reduce((acc, s) => acc + (s.actual_reps ?? 0), 0),
-      duration: formatDuration(session.created_at, completedAt),
+      duration: formatDuration(firstStartedAt ?? session.created_at, completedAt),
       activeTime,
     })
     setFinishing(false)

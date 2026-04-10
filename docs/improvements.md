@@ -227,7 +227,8 @@
 | 25 | Dashboard time analytics | ✅ Done | Medium | Low |
 | 26 | Achievements | ✅ Done | Medium | High |
 | 27 | Automated tests (Jest) | ⏳ Pending | Medium | High |
-| 28 | README | ⏳ Pending | Low | Low |
+| 28 | README | ✅ Done | Low | Low |
+| 29 | Circuit mode | ⏳ Pending | Medium | High |
 
 ---
 
@@ -237,6 +238,21 @@
 - Add integration tests for Supabase queries using a test database or mocked client
 - Add E2E tests for the core flows: login → create routine → start workout → complete sets → finish
 - Set up CI to run tests on every PR
+
+---
+
+## 24. Circuit Mode
+
+- Add `is_circuit boolean default false` to the `routines` table (migration)
+- Routine builder: toggle at the top of the form — "Padrão / Circuito"
+- Workout progression in circuit mode: sets are activated by round, not by exercise
+  - Round 1: S1 of every exercise in display order
+  - Round 2: S2 of every exercise in display order
+  - Round 3: S3 of every exercise in display order
+- Workout UI groups sets by round ("Rodada 1 / 3") instead of by exercise
+- Rest timers apply between exercises within a round (using each exercise's `rest_seconds`)
+- All existing logic (set ordering enforcement, blocking parallel sets, timed exercises, completion summary) must work in circuit mode
+- Calendar and dashboard analytics remain unchanged — `workout_sets` rows are the same regardless of mode
 
 ---
 
