@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import type { ExerciseWithClass } from '@/lib/types'
-import { exerciseLabel } from '@/lib/types'
+import { exerciseLabel, routineMode, setUnit } from '@/lib/types'
 import { normalize } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -45,6 +45,7 @@ type RowDraft = {
 export type RoutineFormInitialData = {
   name: string
   rows: RowDraft[]
+  isCircuit?: boolean
 }
 
 type Props = {
@@ -132,7 +133,7 @@ function SortableRow({ row, index, onUpdate, onUpdateTargetSeconds, onUpdateRest
                   className="w-14 h-8 text-center"
                   min={1}
                 />
-                <span className="text-sm text-muted-foreground">seg</span>
+                <span className="text-sm text-muted-foreground">{setUnit(true)}</span>
               </div>
             ) : (
               <div className="flex items-center gap-1">
@@ -143,7 +144,7 @@ function SortableRow({ row, index, onUpdate, onUpdateTargetSeconds, onUpdateRest
                   className="w-14 h-8 text-center"
                   min={1}
                 />
-                <span className="text-sm text-muted-foreground">reps</span>
+                <span className="text-sm text-muted-foreground">{setUnit(false)}</span>
               </div>
             )}
 
@@ -178,6 +179,7 @@ export default function RoutineForm({ routineId, allExercises, initialData }: Pr
   const initialRowIds = useRef<Set<string>>(
     new Set(initialData?.rows.map((r) => r.id).filter(Boolean) as string[])
   )
+  const [isCircuit, setIsCircuit] = useState(initialData?.isCircuit ?? false)
   const [exercises, setExercises] = useState<ExerciseWithClass[]>(allExercises)
   const [search, setSearch] = useState('')
   const [saving, setSaving] = useState(false)
@@ -288,11 +290,11 @@ function handleDragEnd(event: DragEndEvent) {
 
     let rid = routineId
     if (rid) {
-      const { error } = await supabase.from('routines').update({ name }).eq('id', rid)
+      const { error } = await supabase.from('routines').update({ name, is_circuit: isCircuit }).eq('id', rid)
       if (error) { toast.error('Não foi possível atualizar o treino.'); setSaving(false); return }
     } else {
       const { data: { user } } = await supabase.auth.getUser()
-      const { data, error } = await supabase.from('routines').insert({ name, user_id: user?.id }).select().single()
+      const { data, error } = await supabase.from('routines').insert({ name, is_circuit: isCircuit, user_id: user?.id }).select().single()
       if (error) { toast.error('Não foi possível criar o treino.'); setSaving(false); return }
       rid = data?.id
     }
@@ -367,6 +369,41 @@ function handleDragEnd(event: DragEndEvent) {
           onChange={(e) => setName(e.target.value)}
           placeholder="ex: Treino A, Push Day…"
         />
+      </div>
+
+      <div className="space-y-2">
+        <Label>Modo</Label>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setIsCircuit(false)}
+            className={[
+              'px-4 py-2 rounded-lg text-sm font-medium border transition-colors',
+              !isCircuit
+                ? 'bg-primary text-primary-foreground border-primary'
+                : 'border-border text-muted-foreground hover:bg-accent',
+            ].join(' ')}
+          >
+            {routineMode(false)}
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsCircuit(true)}
+            className={[
+              'px-4 py-2 rounded-lg text-sm font-medium border transition-colors',
+              isCircuit
+                ? 'bg-primary text-primary-foreground border-primary'
+                : 'border-border text-muted-foreground hover:bg-accent',
+            ].join(' ')}
+          >
+            {routineMode(true)}
+          </button>
+        </div>
+        {isCircuit && (
+          <p className="text-xs text-muted-foreground">
+            Uma série de cada exercício por rodada, em sequência.
+          </p>
+        )}
       </div>
 
       {!routineId && (

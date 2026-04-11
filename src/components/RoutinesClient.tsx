@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import type { Routine } from '@/lib/types'
+import { routineMode } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Pencil, Archive, RotateCcw, ChevronDown, Plus } from 'lucide-react'
 
@@ -70,7 +71,12 @@ export default function RoutinesClient({ routines: initial, archivedRoutines: in
               key={routine.id}
               className="rounded-xl border bg-card card-elevated px-4 py-3.5 flex items-center gap-3"
             >
-              <p className="font-semibold flex-1 truncate">{routine.name}</p>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold truncate">{routine.name}</p>
+                <p className="text-xs font-medium text-muted-foreground mt-0.5">
+                  {routineMode(routine.is_circuit)}
+                </p>
+              </div>
               <div className="flex gap-1 shrink-0">
                 <Button
                   size="sm"
@@ -111,7 +117,12 @@ export default function RoutinesClient({ routines: initial, archivedRoutines: in
                   key={routine.id}
                   className="rounded-xl border bg-card px-4 py-3.5 flex items-center gap-3 opacity-60"
                 >
-                  <p className="font-semibold flex-1 truncate">{routine.name}</p>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold truncate">{routine.name}</p>
+                    <p className="text-xs font-medium text-muted-foreground mt-0.5">
+                      {routineMode(routine.is_circuit)}
+                    </p>
+                  </div>
                   <Button
                     size="sm"
                     variant="ghost"

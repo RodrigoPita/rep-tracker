@@ -22,6 +22,7 @@ export type Exercise = {
 export type Routine = {
   id: string
   name: string
+  is_circuit: boolean
   archived_at: string | null
   created_at: string
 }
@@ -100,4 +101,14 @@ export type CalendarSession = WorkoutSession & {
 /** "Flexão — Diamante" */
 export function exerciseLabel(exercise: ExerciseWithClass): string {
   return `${exercise.exercise_classes.name} — ${exercise.variant}`
+}
+
+/** "Padrão" | "Circuito" */
+export function routineMode(isCircuit: boolean): string {
+  return isCircuit ? 'Circuito' : 'Padrão'
+}
+
+/** "seg" | "reps" */
+export function setUnit(isTimed: boolean): string {
+  return isTimed ? 'seg' : 'reps'
 }

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import type { WorkoutSetWithExercise, WorkoutSessionWithRoutine } from '@/lib/types'
-import { exerciseLabel } from '@/lib/types'
+import { exerciseLabel, setUnit } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { Input } from '@/components/ui/input'
@@ -279,15 +279,23 @@ export default function WorkoutClient({ session, initialSets }: Props) {
     }
 
     // Start rest timer if this exercise has rest_seconds configured,
-    // but not after the last set of the last exercise
+    // but not after the very last set of the workout
     const restSeconds = set?.routine_exercises?.rest_seconds
     if (restSeconds && restSeconds > 0) {
-      const maxOrder = Math.max(...sets.map((s) => s.routine_exercises.display_order))
-      const lastExerciseSets = sets.filter((s) => s.routine_exercises.display_order === maxOrder)
-      const lastSetNumber = Math.max(...lastExerciseSets.map((s) => s.set_number))
-      const isLastSetOfLastExercise =
-        lastExerciseSets.find((s) => s.set_number === lastSetNumber)?.id === setId
-      if (!isLastSetOfLastExercise) {
+      let isLastSet: boolean
+      if (isCircuit) {
+        const maxRound = Math.max(...sets.map((s) => s.set_number))
+        const lastRoundSets = sets
+          .filter((s) => s.set_number === maxRound)
+          .sort((a, b) => b.routine_exercises.display_order - a.routine_exercises.display_order)
+        isLastSet = lastRoundSets[0]?.id === setId
+      } else {
+        const maxOrder = Math.max(...sets.map((s) => s.routine_exercises.display_order))
+        const lastExerciseSets = sets.filter((s) => s.routine_exercises.display_order === maxOrder)
+        const lastSetNumber = Math.max(...lastExerciseSets.map((s) => s.set_number))
+        isLastSet = lastExerciseSets.find((s) => s.set_number === lastSetNumber)?.id === setId
+      }
+      if (!isLastSet) {
         setRestState({ afterSetId: setId, startedAt: new Date() })
       }
     }
@@ -307,17 +315,34 @@ export default function WorkoutClient({ session, initialSets }: Props) {
     const afterSet = sets.find((s) => s.id === afterSetId)
     if (!afterSet) return
 
-    const nextSet =
-      sets.find(
-        (s) =>
-          s.routine_exercise_id === afterSet.routine_exercise_id &&
-          s.set_number === afterSet.set_number + 1 &&
-          !s.completed,
-      ) ??
-      sets
-        .filter((s) => s.routine_exercises.display_order > afterSet.routine_exercises.display_order && !s.completed)
-        .sort((a, b) => a.routine_exercises.display_order - b.routine_exercises.display_order || a.set_number - b.set_number)[0] ??
-      null
+    let nextSet: WorkoutSetWithExercise | null
+
+    if (isCircuit) {
+      // Circuit: next exercise in the same round → first exercise of the next round
+      const currentRound = afterSet.set_number
+      const currentOrder = afterSet.routine_exercises.display_order
+      nextSet =
+        sets
+          .filter((s) => s.set_number === currentRound && s.routine_exercises.display_order > currentOrder && !s.completed)
+          .sort((a, b) => a.routine_exercises.display_order - b.routine_exercises.display_order)[0] ??
+        sets
+          .filter((s) => s.set_number > currentRound && !s.completed)
+          .sort((a, b) => a.set_number - b.set_number || a.routine_exercises.display_order - b.routine_exercises.display_order)[0] ??
+        null
+    } else {
+      // Standard: next set of same exercise → first incomplete set of next exercise
+      nextSet =
+        sets.find(
+          (s) =>
+            s.routine_exercise_id === afterSet.routine_exercise_id &&
+            s.set_number === afterSet.set_number + 1 &&
+            !s.completed,
+        ) ??
+        sets
+          .filter((s) => s.routine_exercises.display_order > afterSet.routine_exercises.display_order && !s.completed)
+          .sort((a, b) => a.routine_exercises.display_order - b.routine_exercises.display_order || a.set_number - b.set_number)[0] ??
+        null
+    }
 
     if (!nextSet) return
 
@@ -420,6 +445,8 @@ export default function WorkoutClient({ session, initialSets }: Props) {
     }
   }
 
+  const isCircuit = !!session.routines?.is_circuit
+
   const completedCount = sets.filter((s) => s.completed).length
   const totalCount = sets.length
   const progress = totalCount > 0 ? (completedCount / totalCount) * 100 : 0
@@ -436,6 +463,24 @@ export default function WorkoutClient({ session, initialSets }: Props) {
   const totalExercises = exerciseGroups.length
   const totalPlannedSets = sets.length
 
+  // Circuit mode: group sets by round (set_number), sort each round by display_order
+  const roundGroups = isCircuit
+    ? sets.reduce<Record<number, WorkoutSetWithExercise[]>>((acc, set) => {
+        if (!acc[set.set_number]) acc[set.set_number] = []
+        acc[set.set_number].push(set)
+        return acc
+      }, {})
+    : {}
+  if (isCircuit) {
+    for (const round in roundGroups) {
+      roundGroups[Number(round)].sort(
+        (a, b) => a.routine_exercises.display_order - b.routine_exercises.display_order
+      )
+    }
+  }
+  const roundKeys = Object.keys(roundGroups).map(Number).sort((a, b) => a - b)
+  const totalRounds = roundKeys.length
+
   return (
     <>
       <div className="space-y-6">
@@ -447,7 +492,7 @@ export default function WorkoutClient({ session, initialSets }: Props) {
             </p>
             <h1 className="text-3xl font-bold tracking-tight">{session.routines?.name}</h1>
             <p className="text-sm text-muted-foreground mt-1 capitalize">
-              {formatDate(session.date)} · {totalExercises} exercício{totalExercises !== 1 ? 's' : ''} · {totalPlannedSets} série{totalPlannedSets !== 1 ? 's' : ''}
+              {formatDate(session.date)} · {totalExercises} exercício{totalExercises !== 1 ? 's' : ''} · {isCircuit ? `${totalRounds} rodada${totalRounds !== 1 ? 's' : ''}` : `${totalPlannedSets} série${totalPlannedSets !== 1 ? 's' : ''}`}
             </p>
           </div>
           <div className="space-y-1.5">
@@ -485,170 +530,338 @@ export default function WorkoutClient({ session, initialSets }: Props) {
           </div>
         )}
 
-        {/* Exercise groups */}
-        {exerciseGroups.map((exerciseSets) => {
-          const exercise = exerciseSets[0].routine_exercises.exercises
-          const groupDone = exerciseSets.every((s) => s.completed)
-          const label = exerciseLabel(exercise)
-          const [className, variant] = label.split(' — ')
+        {/* Exercise / round groups */}
+        {isCircuit ? (
+          // ── Circuit mode: one card per round, one row per exercise ──────────
+          roundKeys.map((round) => {
+            const roundSets = roundGroups[round]
+            const roundDone = roundSets.every((s) => s.completed)
 
-          return (
-            <div
-              key={exerciseSets[0].routine_exercise_id}
-              className={[
-                'rounded-xl border bg-card card-elevated overflow-hidden transition-all',
-                groupDone ? 'border-green-300' : '',
-              ].join(' ')}
-            >
-              <div className={['px-4 py-3 border-b flex items-center justify-between', groupDone ? 'bg-green-50 dark:bg-green-950/30' : 'bg-card'].join(' ')}>
-                <div>
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{className}</p>
-                  <p className="font-semibold text-base">{variant ?? className}</p>
+            return (
+              <div
+                key={round}
+                className={[
+                  'rounded-xl border bg-card card-elevated overflow-hidden transition-all',
+                  roundDone ? 'border-green-300' : '',
+                ].join(' ')}
+              >
+                <div className={['px-4 py-3 border-b flex items-center justify-between', roundDone ? 'bg-green-50 dark:bg-green-950/30' : 'bg-card'].join(' ')}>
+                  <p className="font-semibold">Rodada {round} / {totalRounds}</p>
+                  {roundDone && <CheckCircle2 className="w-5 h-5 text-green-500" />}
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  {!groupDone && (
-                    <button
-                      onClick={() => { const k = exerciseSets[0].routine_exercise_id ?? 'unknown'; setWeightExpanded((prev) => ({ ...prev, [k]: !prev[k] })) }}
-                      className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      {weightExpanded[exerciseSets[0].routine_exercise_id ?? 'unknown'] ? '− carga' : '＋ carga'}
-                    </button>
-                  )}
-                  {groupDone && <CheckCircle2 className="w-5 h-5 text-green-500" />}
-                </div>
-              </div>
 
-              <div className="divide-y divide-border">
-                {exerciseSets.map((set, setIndex) => {
-                  const isActive = !!activeSetTimes[set.id]
-                  const activeStart = activeSetTimes[set.id]
-                  const hasActiveSet = Object.keys(activeSetTimes).length > 0
-                  const prevIncomplete = exerciseSets.slice(0, setIndex).some(s => !s.completed)
-                  const isBlocked = !set.completed && !isActive && (hasActiveSet || prevIncomplete)
+                <div className="divide-y divide-border">
+                  {roundSets.map((set, setIndexInRound) => {
+                    const exercise = set.routine_exercises.exercises
+                    const label = exerciseLabel(exercise)
+                    const [className, variant] = label.split(' — ')
+                    const isActive = !!activeSetTimes[set.id]
+                    const activeStart = activeSetTimes[set.id]
+                    const hasActiveSet = Object.keys(activeSetTimes).length > 0
+                    const prevInRoundIncomplete = roundSets.slice(0, setIndexInRound).some((s) => !s.completed)
+                    const isBlocked = !set.completed && !isActive && (hasActiveSet || prevInRoundIncomplete)
+                    const weightKey = set.routine_exercise_id ?? 'unknown'
 
-                  return (
-                    <div key={set.id}>
-                      <div className={[
-                        'flex items-center gap-2 px-3 py-3 transition-colors sm:gap-3 sm:px-4',
-                        set.completed ? 'bg-green-50/60 dark:bg-green-950/20'
-                          : isActive ? 'bg-primary/5'
-                          : 'bg-card',
-                      ].join(' ')}>
-                        <button
-                          disabled={isBlocked}
-                          onClick={() => {
-                            if (set.completed) {
-                              undoSet(set.id)
-                            } else if (isActive) {
-                              completeSet(set.id, set.target_reps)
-                            } else {
-                              startSet(set.id)
-                            }
-                          }}
-                          className={[
-                            'shrink-0 transition-transform active:scale-90',
-                            isBlocked ? 'opacity-30 cursor-not-allowed' : '',
-                          ].join(' ')}
-                          aria-label={set.completed ? 'Desfazer série' : isActive ? 'Completar série' : 'Iniciar série'}
-                        >
-                          {set.completed ? (
-                            <CheckCircle2 className="w-6 h-6 text-green-500" />
-                          ) : isActive ? (
-                            <CheckCircle2 className="w-6 h-6 text-primary" />
-                          ) : (
-                            <Circle className="w-6 h-6 text-muted-foreground/30" />
-                          )}
-                        </button>
-
-                        <span className={['text-xs font-medium w-10 shrink-0 sm:text-sm sm:w-14', set.completed ? 'text-muted-foreground' : ''].join(' ')}>
-                          S{set.set_number}
-                        </span>
-
-                        {weightExpanded[set.routine_exercise_id ?? 'unknown'] && (
-                          <>
-                            <Input
-                              type="number"
-                              placeholder="kg"
-                              value={weightOverrides[set.id] ?? (set.weight_kg != null ? String(set.weight_kg) : '')}
-                              onChange={(e) => {
-                                const val = e.target.value
-                                if (val === '' || parseFloat(val) >= 0) {
-                                  setWeightOverrides((prev) => ({ ...prev, [set.id]: val }))
-                                }
-                              }}
-                              disabled={set.completed}
-                              className={[
-                                'w-14 h-9 text-center font-semibold tabular-nums shrink-0 sm:w-16',
-                                set.completed ? 'text-muted-foreground' : '',
-                              ].join(' ')}
-                            />
-                            <span className="text-xs text-muted-foreground shrink-0 sm:text-sm">kg</span>
-                          </>
-                        )}
-
-                        {set.routine_exercises.exercises.exercise_classes.is_timed ? (
-                          // Timed exercise: show countdown while active, elapsed when done, target when pending
-                          <div className="flex items-center gap-1.5 ml-1">
-                            {isActive && activeStart ? (
-                              <TimedSetCountdown
-                                targetSeconds={set.routine_exercises.target_seconds ?? 30}
-                                startedAt={activeStart}
-                              />
-                            ) : set.completed ? (
-                              <span className="text-sm font-mono font-semibold tabular-nums text-muted-foreground">
-                                {formatSeconds(set.actual_reps ?? 0)}
-                              </span>
+                    return (
+                      <div key={set.id}>
+                        <div className={[
+                          'flex items-center gap-2 px-3 py-3 transition-colors sm:gap-3 sm:px-4',
+                          set.completed ? 'bg-green-50/60 dark:bg-green-950/20'
+                            : isActive ? 'bg-primary/5'
+                            : 'bg-card',
+                        ].join(' ')}>
+                          <button
+                            disabled={isBlocked}
+                            onClick={() => {
+                              if (set.completed) {
+                                undoSet(set.id)
+                              } else if (isActive) {
+                                completeSet(set.id, set.target_reps)
+                              } else {
+                                startSet(set.id)
+                              }
+                            }}
+                            className={[
+                              'shrink-0 transition-transform active:scale-90',
+                              isBlocked ? 'opacity-30 cursor-not-allowed' : '',
+                            ].join(' ')}
+                            aria-label={set.completed ? 'Desfazer série' : isActive ? 'Completar série' : 'Iniciar série'}
+                          >
+                            {set.completed ? (
+                              <CheckCircle2 className="w-6 h-6 text-green-500" />
+                            ) : isActive ? (
+                              <CheckCircle2 className="w-6 h-6 text-primary" />
                             ) : (
-                              <span className="text-sm font-mono tabular-nums text-muted-foreground">
-                                {formatSeconds(set.routine_exercises.target_seconds ?? 30)}
-                              </span>
+                              <Circle className="w-6 h-6 text-muted-foreground/30" />
                             )}
-                          </div>
-                        ) : (
-                          <>
-                            <Input
-                              type="number"
-                              placeholder={String(set.target_reps)}
-                              value={repOverrides[set.id] ?? (set.actual_reps != null ? String(set.actual_reps) : '')}
-                              onChange={(e) => {
-                                const val = e.target.value
-                                if (val === '' || parseInt(val) >= 1) {
-                                  setRepOverrides((prev) => ({ ...prev, [set.id]: val }))
-                                }
-                              }}
-                              disabled={set.completed}
-                              className={[
-                                'w-14 h-9 text-center font-semibold tabular-nums shrink-0 sm:w-16',
-                                set.completed ? 'text-muted-foreground line-through' : '',
-                              ].join(' ')}
-                            />
-                            <span className="text-sm text-muted-foreground shrink-0">reps</span>
-                          </>
-                        )}
+                          </button>
 
-                        {/* Live elapsed timer on active rep-based set */}
-                        {isActive && activeStart && !set.routine_exercises.exercises.exercise_classes.is_timed && (
-                          <span className="ml-auto">
-                            <SetTimer startedAt={activeStart} />
-                          </span>
+                          {/* Exercise name */}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs text-muted-foreground uppercase tracking-wide font-semibold truncate">{className}</p>
+                            <p className={['text-sm font-medium truncate', set.completed ? 'text-muted-foreground' : ''].join(' ')}>{variant ?? className}</p>
+                          </div>
+
+                          {/* Weight toggle + input */}
+                          {!set.completed && (
+                            <button
+                              onClick={() => setWeightExpanded((prev) => ({ ...prev, [weightKey]: !prev[weightKey] }))}
+                              className="text-xs text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                            >
+                              {weightExpanded[weightKey] ? '− kg' : '＋ kg'}
+                            </button>
+                          )}
+                          {weightExpanded[weightKey] && (
+                            <>
+                              <Input
+                                type="number"
+                                placeholder="kg"
+                                value={weightOverrides[set.id] ?? (set.weight_kg != null ? String(set.weight_kg) : '')}
+                                onChange={(e) => {
+                                  const val = e.target.value
+                                  if (val === '' || parseFloat(val) >= 0) {
+                                    setWeightOverrides((prev) => ({ ...prev, [set.id]: val }))
+                                  }
+                                }}
+                                disabled={set.completed}
+                                className={[
+                                  'w-14 h-9 text-center font-semibold tabular-nums shrink-0 sm:w-16',
+                                  set.completed ? 'text-muted-foreground' : '',
+                                ].join(' ')}
+                              />
+                              <span className="text-xs text-muted-foreground shrink-0">kg</span>
+                            </>
+                          )}
+
+                          {/* Reps / timed */}
+                          {set.routine_exercises.exercises.exercise_classes.is_timed ? (
+                            <div className="flex items-center gap-1.5">
+                              {isActive && activeStart ? (
+                                <TimedSetCountdown
+                                  targetSeconds={set.routine_exercises.target_seconds ?? 30}
+                                  startedAt={activeStart}
+                                />
+                              ) : set.completed ? (
+                                <span className="text-sm font-mono font-semibold tabular-nums text-muted-foreground">
+                                  {formatSeconds(set.actual_reps ?? 0)}
+                                </span>
+                              ) : (
+                                <span className="text-sm font-mono tabular-nums text-muted-foreground">
+                                  {formatSeconds(set.routine_exercises.target_seconds ?? 30)}
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <>
+                              <Input
+                                type="number"
+                                placeholder={String(set.target_reps)}
+                                value={repOverrides[set.id] ?? (set.actual_reps != null ? String(set.actual_reps) : '')}
+                                onChange={(e) => {
+                                  const val = e.target.value
+                                  if (val === '' || parseInt(val) >= 1) {
+                                    setRepOverrides((prev) => ({ ...prev, [set.id]: val }))
+                                  }
+                                }}
+                                disabled={set.completed}
+                                className={[
+                                  'w-14 h-9 text-center font-semibold tabular-nums shrink-0 sm:w-16',
+                                  set.completed ? 'text-muted-foreground line-through' : '',
+                                ].join(' ')}
+                              />
+                              <span className="text-sm text-muted-foreground shrink-0">{setUnit(false)}</span>
+                            </>
+                          )}
+
+                          {/* Live elapsed timer on active rep-based set */}
+                          {isActive && activeStart && !set.routine_exercises.exercises.exercise_classes.is_timed && (
+                            <span className="ml-auto">
+                              <SetTimer startedAt={activeStart} />
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Rest timer row */}
+                        {restState?.afterSetId === set.id && (
+                          <RestTimer
+                            restSeconds={set.routine_exercises.rest_seconds ?? 60}
+                            startedAt={restState.startedAt}
+                            onEnd={() => endRest(set.id)}
+                          />
                         )}
                       </div>
-
-                      {/* Rest timer row shown after a completed set */}
-                      {restState?.afterSetId === set.id && (
-                        <RestTimer
-                          restSeconds={set.routine_exercises.rest_seconds ?? 60}
-                          startedAt={restState.startedAt}
-                          onEnd={() => endRest(set.id)}
-                        />
-                      )}
-                    </div>
-                  )
-                })}
+                    )
+                  })}
+                </div>
               </div>
-            </div>
-          )
-        })}
+            )
+          })
+        ) : (
+          // ── Standard mode: one card per exercise, sets inside ───────────────
+          exerciseGroups.map((exerciseSets) => {
+            const exercise = exerciseSets[0].routine_exercises.exercises
+            const groupDone = exerciseSets.every((s) => s.completed)
+            const label = exerciseLabel(exercise)
+            const [className, variant] = label.split(' — ')
+
+            return (
+              <div
+                key={exerciseSets[0].routine_exercise_id}
+                className={[
+                  'rounded-xl border bg-card card-elevated overflow-hidden transition-all',
+                  groupDone ? 'border-green-300' : '',
+                ].join(' ')}
+              >
+                <div className={['px-4 py-3 border-b flex items-center justify-between', groupDone ? 'bg-green-50 dark:bg-green-950/30' : 'bg-card'].join(' ')}>
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{className}</p>
+                    <p className="font-semibold text-base">{variant ?? className}</p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {!groupDone && (
+                      <button
+                        onClick={() => { const k = exerciseSets[0].routine_exercise_id ?? 'unknown'; setWeightExpanded((prev) => ({ ...prev, [k]: !prev[k] })) }}
+                        className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        {weightExpanded[exerciseSets[0].routine_exercise_id ?? 'unknown'] ? '− carga' : '＋ carga'}
+                      </button>
+                    )}
+                    {groupDone && <CheckCircle2 className="w-5 h-5 text-green-500" />}
+                  </div>
+                </div>
+
+                <div className="divide-y divide-border">
+                  {exerciseSets.map((set, setIndex) => {
+                    const isActive = !!activeSetTimes[set.id]
+                    const activeStart = activeSetTimes[set.id]
+                    const hasActiveSet = Object.keys(activeSetTimes).length > 0
+                    const prevIncomplete = exerciseSets.slice(0, setIndex).some(s => !s.completed)
+                    const isBlocked = !set.completed && !isActive && (hasActiveSet || prevIncomplete)
+
+                    return (
+                      <div key={set.id}>
+                        <div className={[
+                          'flex items-center gap-2 px-3 py-3 transition-colors sm:gap-3 sm:px-4',
+                          set.completed ? 'bg-green-50/60 dark:bg-green-950/20'
+                            : isActive ? 'bg-primary/5'
+                            : 'bg-card',
+                        ].join(' ')}>
+                          <button
+                            disabled={isBlocked}
+                            onClick={() => {
+                              if (set.completed) {
+                                undoSet(set.id)
+                              } else if (isActive) {
+                                completeSet(set.id, set.target_reps)
+                              } else {
+                                startSet(set.id)
+                              }
+                            }}
+                            className={[
+                              'shrink-0 transition-transform active:scale-90',
+                              isBlocked ? 'opacity-30 cursor-not-allowed' : '',
+                            ].join(' ')}
+                            aria-label={set.completed ? 'Desfazer série' : isActive ? 'Completar série' : 'Iniciar série'}
+                          >
+                            {set.completed ? (
+                              <CheckCircle2 className="w-6 h-6 text-green-500" />
+                            ) : isActive ? (
+                              <CheckCircle2 className="w-6 h-6 text-primary" />
+                            ) : (
+                              <Circle className="w-6 h-6 text-muted-foreground/30" />
+                            )}
+                          </button>
+
+                          <span className={['text-xs font-medium w-10 shrink-0 sm:text-sm sm:w-14', set.completed ? 'text-muted-foreground' : ''].join(' ')}>
+                            S{set.set_number}
+                          </span>
+
+                          {weightExpanded[set.routine_exercise_id ?? 'unknown'] && (
+                            <>
+                              <Input
+                                type="number"
+                                placeholder="kg"
+                                value={weightOverrides[set.id] ?? (set.weight_kg != null ? String(set.weight_kg) : '')}
+                                onChange={(e) => {
+                                  const val = e.target.value
+                                  if (val === '' || parseFloat(val) >= 0) {
+                                    setWeightOverrides((prev) => ({ ...prev, [set.id]: val }))
+                                  }
+                                }}
+                                disabled={set.completed}
+                                className={[
+                                  'w-14 h-9 text-center font-semibold tabular-nums shrink-0 sm:w-16',
+                                  set.completed ? 'text-muted-foreground' : '',
+                                ].join(' ')}
+                              />
+                              <span className="text-xs text-muted-foreground shrink-0 sm:text-sm">kg</span>
+                            </>
+                          )}
+
+                          {set.routine_exercises.exercises.exercise_classes.is_timed ? (
+                            // Timed exercise: show countdown while active, elapsed when done, target when pending
+                            <div className="flex items-center gap-1.5 ml-1">
+                              {isActive && activeStart ? (
+                                <TimedSetCountdown
+                                  targetSeconds={set.routine_exercises.target_seconds ?? 30}
+                                  startedAt={activeStart}
+                                />
+                              ) : set.completed ? (
+                                <span className="text-sm font-mono font-semibold tabular-nums text-muted-foreground">
+                                  {formatSeconds(set.actual_reps ?? 0)}
+                                </span>
+                              ) : (
+                                <span className="text-sm font-mono tabular-nums text-muted-foreground">
+                                  {formatSeconds(set.routine_exercises.target_seconds ?? 30)}
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <>
+                              <Input
+                                type="number"
+                                placeholder={String(set.target_reps)}
+                                value={repOverrides[set.id] ?? (set.actual_reps != null ? String(set.actual_reps) : '')}
+                                onChange={(e) => {
+                                  const val = e.target.value
+                                  if (val === '' || parseInt(val) >= 1) {
+                                    setRepOverrides((prev) => ({ ...prev, [set.id]: val }))
+                                  }
+                                }}
+                                disabled={set.completed}
+                                className={[
+                                  'w-14 h-9 text-center font-semibold tabular-nums shrink-0 sm:w-16',
+                                  set.completed ? 'text-muted-foreground line-through' : '',
+                                ].join(' ')}
+                              />
+                              <span className="text-sm text-muted-foreground shrink-0">{setUnit(false)}</span>
+                            </>
+                          )}
+
+                          {/* Live elapsed timer on active rep-based set */}
+                          {isActive && activeStart && !set.routine_exercises.exercises.exercise_classes.is_timed && (
+                            <span className="ml-auto">
+                              <SetTimer startedAt={activeStart} />
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Rest timer row shown after a completed set */}
+                        {restState?.afterSetId === set.id && (
+                          <RestTimer
+                            restSeconds={set.routine_exercises.rest_seconds ?? 60}
+                            startedAt={restState.startedAt}
+                            onEnd={() => endRest(set.id)}
+                          />
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })
+        )}
 
         {/* Finish button */}
         {totalCount > 0 && (
