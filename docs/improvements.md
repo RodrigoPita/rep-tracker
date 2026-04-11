@@ -228,7 +228,7 @@
 | 26 | Achievements | ✅ Done | Medium | High |
 | 27 | Automated tests (Jest) | ⏳ Pending | Medium | High |
 | 28 | README | ✅ Done | Low | Low |
-| 29 | Circuit mode | ⏳ Pending | Medium | High |
+| 29 | Circuit mode | ✅ Done | Medium | High |
 
 ---
 

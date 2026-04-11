@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { todayBRT } from '@/lib/utils'
 import type { Routine, RoutinePeriod, WorkoutSession } from '@/lib/types'
+import { routineMode } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ChevronRight, Play, Plus } from 'lucide-react'
@@ -145,6 +146,9 @@ export default function HomeClient({ routines, activeSessions, periods, sessionC
               >
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold truncate">{routine.name}</p>
+                  <p className="text-xs font-medium text-muted-foreground mt-0.5">
+                    {routineMode(routine.is_circuit)}
+                  </p>
                   {period && (
                     <div className="mt-1.5 space-y-1">
                       <div className="h-1.5 rounded-full bg-muted overflow-hidden">

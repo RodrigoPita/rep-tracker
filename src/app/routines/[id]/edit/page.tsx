@@ -35,7 +35,7 @@ export default async function EditRoutinePage({ params }: { params: Promise<{ id
       <RoutineForm
         routineId={id}
         allExercises={(exercisesData ?? []) as ExerciseWithClass[]}
-        initialData={{ name: routine?.name ?? '', rows: initialRows }}
+        initialData={{ name: routine?.name ?? '', rows: initialRows, isCircuit: routine?.is_circuit ?? false }}
       />
     </div>
   )
