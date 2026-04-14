@@ -62,6 +62,9 @@ export type RoutineFormInitialData = {
   name: string
   blocks: BlockDraft[]
   isCircuit?: boolean
+  interExerciseRestSeconds?: number | null
+  roundRestSeconds?: number | null
+  circuitRestSeconds?: number | null
 }
 
 type Props = {
@@ -170,6 +173,7 @@ type SortableBlockProps = {
   blockIndex: number
   variantsByClass: Record<string, ExerciseWithClass[]>
   sensors: ReturnType<typeof useSensors>
+  isCircuit: boolean
   onUpdateConfig: (blockIndex: number, field: 'targetReps' | 'restSeconds' | 'targetSeconds', value: number | null) => void
   onChangeVariant: (blockIndex: number, setIndex: number, exerciseId: string, variantLabel: string) => void
   onAddSet: (blockIndex: number) => void
@@ -183,6 +187,7 @@ function SortableBlock({
   blockIndex,
   variantsByClass,
   sensors,
+  isCircuit,
   onUpdateConfig,
   onChangeVariant,
   onAddSet,
@@ -190,6 +195,7 @@ function SortableBlock({
   onRemoveBlock,
   onInnerDragEnd,
 }: SortableBlockProps) {
+  const [repsInput, setRepsInput] = useState<string>(String(block.targetReps))
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: block.draftId,
   })
@@ -250,8 +256,16 @@ function SortableBlock({
               <div className="flex items-center gap-1">
                 <Input
                   type="number"
-                  value={block.targetReps}
-                  onChange={(e) => onUpdateConfig(blockIndex, 'targetReps', parseInt(e.target.value) || 1)}
+                  value={repsInput}
+                  onChange={(e) => {
+                    setRepsInput(e.target.value)
+                    const v = parseInt(e.target.value)
+                    if (!isNaN(v) && v >= 1) onUpdateConfig(blockIndex, 'targetReps', v)
+                  }}
+                  onBlur={() => {
+                    const v = parseInt(repsInput)
+                    if (isNaN(v) || v < 1) setRepsInput(String(block.targetReps))
+                  }}
                   className="w-14 h-8 text-center"
                   min={1}
                 />
@@ -259,59 +273,86 @@ function SortableBlock({
               </div>
             )}
 
-            <div className="flex items-center gap-1">
-              <Timer className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-              <Input
-                type="number"
-                value={block.restSeconds ?? ''}
+            {!isCircuit && (
+              <div className="flex items-center gap-1">
+                <Timer className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                <Input
+                  type="number"
+                  value={block.restSeconds ?? ''}
+                  onChange={(e) => {
+                    const v = parseInt(e.target.value)
+                    onUpdateConfig(blockIndex, 'restSeconds', e.target.value === '' || isNaN(v) ? null : v)
+                  }}
+                  placeholder="—"
+                  className="w-14 h-8 text-center"
+                  min={1}
+                />
+                <span className="text-sm text-muted-foreground">s</span>
+              </div>
+            )}
+          </div>
+
+          {/* Row 3: variant picker */}
+          {isCircuit ? (
+            // Circuit mode: single variant choice applied to all rounds
+            <div className="pl-6">
+              <select
+                value={block.setRows[0]?.exerciseId ?? ''}
                 onChange={(e) => {
-                  const v = parseInt(e.target.value)
-                  onUpdateConfig(blockIndex, 'restSeconds', e.target.value === '' || isNaN(v) ? null : v)
+                  const ex = variants.find((v) => v.id === e.target.value)
+                  if (ex) onChangeVariant(blockIndex, 0, ex.id, ex.variant)
+                  else onChangeVariant(blockIndex, 0, '', '')
                 }}
-                placeholder="—"
-                className="w-14 h-8 text-center"
-                min={1}
-              />
-              <span className="text-sm text-muted-foreground">s</span>
-            </div>
-          </div>
-
-          {/* Row 3: per-set variant rows (inner DnD) */}
-          <div className="pl-6 space-y-1.5">
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragEnd={(e) => onInnerDragEnd(blockIndex, e)}
-            >
-              <SortableContext
-                items={block.setRows.map((r) => r.draftId)}
-                strategy={verticalListSortingStrategy}
+                className={[
+                  'w-full h-8 rounded-md border bg-background px-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring',
+                  block.setRows[0]?.exerciseId ? 'border-input' : 'border-destructive text-muted-foreground',
+                ].join(' ')}
+                aria-label="Variante"
               >
-                {block.setRows.map((setRow, setIndex) => (
-                  <SortableSetRow
-                    key={setRow.draftId}
-                    setRow={setRow}
-                    blockIndex={blockIndex}
-                    setIndex={setIndex}
-                    variantsForClass={variants}
-                    isTimed={block.isTimed}
-                    onChangeVariant={onChangeVariant}
-                    onRemove={onRemoveSet}
-                    canRemove={block.setRows.length > 1}
-                  />
+                <option value="">—</option>
+                {variants.map((v) => (
+                  <option key={v.id} value={v.id}>{v.variant}</option>
                 ))}
-              </SortableContext>
-            </DndContext>
+              </select>
+            </div>
+          ) : (
+            // Standard mode: per-set variant rows with DnD
+            <div className="pl-6 space-y-1.5">
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={(e) => onInnerDragEnd(blockIndex, e)}
+              >
+                <SortableContext
+                  items={block.setRows.map((r) => r.draftId)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  {block.setRows.map((setRow, setIndex) => (
+                    <SortableSetRow
+                      key={setRow.draftId}
+                      setRow={setRow}
+                      blockIndex={blockIndex}
+                      setIndex={setIndex}
+                      variantsForClass={variants}
+                      isTimed={block.isTimed}
+                      onChangeVariant={onChangeVariant}
+                      onRemove={onRemoveSet}
+                      canRemove={block.setRows.length > 1}
+                    />
+                  ))}
+                </SortableContext>
+              </DndContext>
 
-            <button
-              type="button"
-              onClick={() => onAddSet(blockIndex)}
-              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors pt-0.5"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              Série
-            </button>
-          </div>
+              <button
+                type="button"
+                onClick={() => onAddSet(blockIndex)}
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors pt-0.5"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Série
+              </button>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
@@ -325,6 +366,21 @@ export default function RoutineForm({ routineId, allExercises, initialData }: Pr
   const [name, setName] = useState(initialData?.name ?? '')
   const [blocks, setBlocks] = useState<BlockDraft[]>(initialData?.blocks ?? [])
   const [isCircuit, setIsCircuit] = useState(initialData?.isCircuit ?? false)
+  const [rounds, setRounds] = useState<number>(() => {
+    if (initialData?.isCircuit && initialData.blocks.length > 0) {
+      return Math.max(1, initialData.blocks[0].setRows.length)
+    }
+    return 3
+  })
+  const [roundsInput, setRoundsInput] = useState<string>(() => {
+    if (initialData?.isCircuit && initialData.blocks.length > 0) {
+      return String(Math.max(1, initialData.blocks[0].setRows.length))
+    }
+    return '3'
+  })
+  const [interExerciseRestSeconds, setInterExerciseRestSeconds] = useState<number | null>(initialData?.interExerciseRestSeconds ?? null)
+  const [roundRestSeconds, setRoundRestSeconds] = useState<number | null>(initialData?.roundRestSeconds ?? null)
+  const [circuitRestSeconds, setCircuitRestSeconds] = useState<number | null>(initialData?.circuitRestSeconds ?? null)
   const exercises = allExercises
   const [search, setSearch] = useState('')
   const [showPicker, setShowPicker] = useState(false)
@@ -369,6 +425,42 @@ export default function RoutineForm({ routineId, allExercises, initialData }: Pr
     normalize(c.className).includes(normalize(search))
   )
 
+  function handleModeChange(circuit: boolean) {
+    if (circuit && !isCircuit) {
+      // Switching Padrão → Circuito: collapse each block to `rounds` uniform rows
+      setBlocks((prev) => prev.map((b) => {
+        const first = b.setRows[0]
+        return {
+          ...b,
+          setRows: Array.from({ length: rounds }, (_, i) =>
+            i === 0
+              ? first ?? { draftId: crypto.randomUUID(), exerciseId: '', variantLabel: '' }
+              : { draftId: crypto.randomUUID(), exerciseId: first?.exerciseId ?? '', variantLabel: first?.variantLabel ?? '' }
+          ),
+        }
+      }))
+    }
+    setIsCircuit(circuit)
+  }
+
+  function handleRoundsChange(newRounds: number) {
+    if (newRounds < 1) return
+    setRounds(newRounds)
+    setBlocks((prev) => prev.map((b) => {
+      const current = b.setRows
+      if (newRounds > current.length) {
+        const first = current[0]
+        const toAdd = Array.from({ length: newRounds - current.length }, () => ({
+          draftId: crypto.randomUUID(),
+          exerciseId: first?.exerciseId ?? '',
+          variantLabel: first?.variantLabel ?? '',
+        }))
+        return { ...b, setRows: [...current, ...toAdd] }
+      }
+      return { ...b, setRows: current.slice(0, newRounds) }
+    }))
+  }
+
   function addBlock(classInfo: { classId: string; className: string; isTimed: boolean }) {
     setBlocks((prev) => [
       ...prev,
@@ -381,7 +473,9 @@ export default function RoutineForm({ routineId, allExercises, initialData }: Pr
         targetSeconds: classInfo.isTimed ? 30 : null,
         restSeconds: null,
         displayOrder: prev.length,
-        setRows: [{ draftId: crypto.randomUUID(), exerciseId: '', variantLabel: '' }],
+        setRows: isCircuit
+          ? Array.from({ length: rounds }, () => ({ draftId: crypto.randomUUID(), exerciseId: '', variantLabel: '' }))
+          : [{ draftId: crypto.randomUUID(), exerciseId: '', variantLabel: '' }],
       },
     ])
     setSearch('')
@@ -420,9 +514,9 @@ export default function RoutineForm({ routineId, allExercises, initialData }: Pr
       if (bi !== blockIndex) return b
       return {
         ...b,
-        setRows: b.setRows.map((r, si) =>
-          si === setIndex ? { ...r, exerciseId, variantLabel } : r
-        ),
+        setRows: isCircuit
+          ? b.setRows.map((r) => ({ ...r, exerciseId, variantLabel }))
+          : b.setRows.map((r, si) => si === setIndex ? { ...r, exerciseId, variantLabel } : r),
       }
     }))
   }
@@ -490,11 +584,11 @@ export default function RoutineForm({ routineId, allExercises, initialData }: Pr
 
     let rid = routineId
     if (rid) {
-      const { error } = await supabase.from('routines').update({ name, is_circuit: isCircuit }).eq('id', rid)
+      const { error } = await supabase.from('routines').update({ name, is_circuit: isCircuit, inter_exercise_rest_seconds: interExerciseRestSeconds ?? null, round_rest_seconds: roundRestSeconds ?? null, circuit_rest_seconds: circuitRestSeconds ?? null }).eq('id', rid)
       if (error) { toast.error('Não foi possível atualizar o treino.'); setSaving(false); return }
     } else {
       const { data: { user } } = await supabase.auth.getUser()
-      const { data, error } = await supabase.from('routines').insert({ name, is_circuit: isCircuit, user_id: user?.id }).select().single()
+      const { data, error } = await supabase.from('routines').insert({ name, is_circuit: isCircuit, inter_exercise_rest_seconds: interExerciseRestSeconds ?? null, round_rest_seconds: roundRestSeconds ?? null, circuit_rest_seconds: circuitRestSeconds ?? null, user_id: user?.id }).select().single()
       if (error) { toast.error('Não foi possível criar o treino.'); setSaving(false); return }
       rid = data?.id
     }
@@ -590,7 +684,7 @@ export default function RoutineForm({ routineId, allExercises, initialData }: Pr
         <div className="flex gap-2">
           <button
             type="button"
-            onClick={() => setIsCircuit(false)}
+            onClick={() => handleModeChange(false)}
             className={[
               'px-4 py-2 rounded-lg text-sm font-medium border transition-colors',
               !isCircuit
@@ -602,7 +696,7 @@ export default function RoutineForm({ routineId, allExercises, initialData }: Pr
           </button>
           <button
             type="button"
-            onClick={() => setIsCircuit(true)}
+            onClick={() => handleModeChange(true)}
             className={[
               'px-4 py-2 rounded-lg text-sm font-medium border transition-colors',
               isCircuit
@@ -619,6 +713,89 @@ export default function RoutineForm({ routineId, allExercises, initialData }: Pr
           </p>
         )}
       </div>
+
+      {!isCircuit && (
+        <div className="space-y-2">
+          <Label>Descanso entre exercícios</Label>
+          <div className="flex items-center gap-2">
+            <Input
+              type="number"
+              value={interExerciseRestSeconds ?? ''}
+              onChange={(e) => {
+                const v = parseInt(e.target.value)
+                setInterExerciseRestSeconds(e.target.value === '' || isNaN(v) ? null : v)
+              }}
+              placeholder="—"
+              className="w-20"
+              min={1}
+            />
+            <span className="text-sm text-muted-foreground">s</span>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Substitui o descanso individual ao terminar cada exercício.
+          </p>
+        </div>
+      )}
+
+      {isCircuit && (
+        <div className="space-y-3">
+          <div className="space-y-2">
+            <Label>Rodadas</Label>
+            <div className="flex items-center gap-2">
+              <Input
+                type="number"
+                value={roundsInput}
+                onChange={(e) => {
+                  setRoundsInput(e.target.value)
+                  const v = parseInt(e.target.value)
+                  if (!isNaN(v) && v >= 1) handleRoundsChange(v)
+                }}
+                onBlur={() => {
+                  const v = parseInt(roundsInput)
+                  if (isNaN(v) || v < 1) setRoundsInput(String(rounds))
+                }}
+                className="w-20"
+                min={1}
+              />
+              <span className="text-sm text-muted-foreground">rodadas</span>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label>Descanso entre exercícios</Label>
+            <div className="flex items-center gap-2">
+              <Input
+                type="number"
+                value={circuitRestSeconds ?? ''}
+                onChange={(e) => {
+                  const v = parseInt(e.target.value)
+                  setCircuitRestSeconds(e.target.value === '' || isNaN(v) ? null : v)
+                }}
+                placeholder="—"
+                className="w-20"
+                min={1}
+              />
+              <span className="text-sm text-muted-foreground">s</span>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label>Descanso entre rodadas</Label>
+            <div className="flex items-center gap-2">
+              <Input
+                type="number"
+                value={roundRestSeconds ?? ''}
+                onChange={(e) => {
+                  const v = parseInt(e.target.value)
+                  setRoundRestSeconds(e.target.value === '' || isNaN(v) ? null : v)
+                }}
+                placeholder="—"
+                className="w-20"
+                min={1}
+              />
+              <span className="text-sm text-muted-foreground">s</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {!routineId && (
         <div className="space-y-2">
@@ -653,6 +830,7 @@ export default function RoutineForm({ routineId, allExercises, initialData }: Pr
                   blockIndex={i}
                   variantsByClass={variantsByClass}
                   sensors={sensors}
+                  isCircuit={isCircuit}
                   onUpdateConfig={updateConfig}
                   onChangeVariant={changeVariant}
                   onAddSet={addSet}
