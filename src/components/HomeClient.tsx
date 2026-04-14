@@ -44,12 +44,15 @@ export default function HomeClient({ routines, activeSessions, periods, sessionC
       return
     }
 
+    // Fetch per-set rows (set_number IS NOT NULL), ordered by block display_order then set_number
     const { data: reData, error: reError } = await supabase
       .from('routine_exercises')
       .select('*')
       .eq('routine_id', routineId)
       .is('deleted_at', null)
+      .not('set_number', 'is', null)
       .order('display_order')
+      .order('set_number')
 
     if (reError) {
       await supabase.from('workout_sessions').delete().eq('id', data.id)
@@ -59,15 +62,14 @@ export default function HomeClient({ routines, activeSessions, periods, sessionC
     }
 
     if (reData && reData.length > 0) {
+      // One workout_set per routine_exercise row — no expansion needed
       const { error: setsError } = await supabase.from('workout_sets').insert(
-        reData.flatMap((re) =>
-          Array.from({ length: re.sets }, (_, i) => ({
-            session_id: data.id,
-            routine_exercise_id: re.id,
-            set_number: i + 1,
-            target_reps: re.target_reps,
-          }))
-        )
+        reData.map((re) => ({
+          session_id: data.id,
+          routine_exercise_id: re.id,
+          set_number: re.set_number,
+          target_reps: re.target_reps,
+        }))
       )
       if (setsError) {
         await supabase.from('workout_sessions').delete().eq('id', data.id)

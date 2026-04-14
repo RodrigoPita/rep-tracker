@@ -229,6 +229,9 @@
 | 27 | Automated tests (Jest) | ⏳ Pending | Medium | High |
 | 28 | README | ✅ Done | Low | Low |
 | 29 | Circuit mode | ✅ Done | Medium | High |
+| 30 | Routine builder — per-set variant picker | ⏳ Pending | High | High |
+| 31 | Padrão — between-exercise rest timer | ⏳ Pending | Medium | Medium |
+| 32 | Circuito — between-round rest timer + shared intra-round rest | ⏳ Pending | Medium | Medium |
 
 ---
 
@@ -253,6 +256,87 @@
 - Rest timers apply between exercises within a round (using each exercise's `rest_seconds`)
 - All existing logic (set ordering enforcement, blocking parallel sets, timed exercises, completion summary) must work in circuit mode
 - Calendar and dashboard analytics remain unchanged — `workout_sets` rows are the same regardless of mode
+
+---
+
+## 30. Routine Builder — Per-Set Variant Picker
+
+Replace the current flat "Flexão — Diamante" combined exercise selector with a two-level, mobile-friendly builder:
+
+**Exercise class card**
+- The user first picks an **exercise class** (e.g. Flexão) via a searchable dropdown — same accent-insensitive search as today
+- The class can be added more than once to the same routine (e.g. two separate Flexão blocks)
+- Inside the class card: sets count, reps/seconds target, and rest timer (between sets of this block)
+
+**Per-set variant picker**
+- Below the config row, one dropdown row appears **per set** — each row lets the user pick the variant for that set
+- Variants are scoped to the selected class (e.g. only Flexão variants appear in a Flexão block)
+- The variant dropdown also has a search bar
+- Example layout for "Flexão — 3 séries · 10 reps · 60 s":
+  ```
+  S1  Normal      ▾
+  S2  Diamante    ▾
+  S3  Aberta      ▾
+  ```
+- Selecting the same variant for every set is allowed (and the default)
+
+**Schema impact**
+- `routine_exercises` currently represents one exercise (class + variant) with N sets; this model needs to change to one row **per set**, or a new `routine_sets` table that links a `routine_exercise` (class-level) to a specific `exercise_id` (variant) per set number
+- `workout_sets` is unaffected — it already stores one row per set with `routine_exercise_id`
+- Migration required; existing routines must be preserved (each existing `routine_exercise` row maps 1:1 to a block with all sets using the same variant)
+
+**Workout UI**
+- The workout card header shows the class name and block config
+- Each set row shows its variant name instead of just "S1 / S2 / S3"
+
+---
+
+## 31. Padrão — Between-Exercise Rest Timer
+
+Add a second rest timer value to the Padrão routine configuration: a **between-exercise rest** that fires when the last set of an exercise block is completed, instead of the per-block rest.
+
+**Routine builder**
+- Add an `inter_exercise_rest_seconds` field to the routine (not to individual exercise blocks)
+- Shown as a separate input in the form, e.g. "Descanso entre exercícios"
+- If not set, behaviour is unchanged (no inter-exercise rest)
+
+**Schema impact**
+- Add `inter_exercise_rest_seconds int` (nullable) to `routines`
+
+**Workout logic**
+- When completing the last set of an exercise block and there is a next block:
+  - Use `routine.inter_exercise_rest_seconds` for the rest timer instead of the block's `rest_seconds`
+- When completing a non-last set, use the block's `rest_seconds` as today
+- When completing the last set of the last block, no rest timer (unchanged)
+
+---
+
+## 32. Circuito — Between-Round Rest Timer + Shared Intra-Round Rest
+
+Two circuit-specific timer additions; neither affects Padrão routines.
+
+**Between-round rest**
+- A `round_rest_seconds` field on the routine (circuit only)
+- Fires after the last exercise of a round is completed, before the first exercise of the next round starts
+- Not fired after the final round
+
+**Shared intra-round rest**
+- A single `circuit_rest_seconds` field on the routine that replaces per-exercise `rest_seconds` inside a circuit
+- Applies between exercises within a round (i.e. after every set except the last of each round)
+- Per-exercise `rest_seconds` values are ignored in circuit mode; the shared value is used instead
+
+**Schema impact**
+- Add `round_rest_seconds int` (nullable) to `routines`
+- Add `circuit_rest_seconds int` (nullable) to `routines`
+
+**Routine builder**
+- These two inputs are shown only when Circuito mode is active, below the Padrão/Circuito toggle
+- Per-exercise rest inputs are hidden in circuit mode (they have no effect)
+
+**Workout logic**
+- After completing a set that is not the last of its round: use `circuit_rest_seconds` (if set)
+- After completing the last set of a round (and there is a next round): use `round_rest_seconds` (if set)
+- After completing the last set of the last round: no rest timer
 
 ---
 
