@@ -229,9 +229,9 @@
 | 27 | Automated tests (Jest) | ⏳ Pending | Medium | High |
 | 28 | README | ✅ Done | Low | Low |
 | 29 | Circuit mode | ✅ Done | Medium | High |
-| 30 | Routine builder — per-set variant picker | ⏳ Pending | High | High |
-| 31 | Padrão — between-exercise rest timer | ⏳ Pending | Medium | Medium |
-| 32 | Circuito — between-round rest timer + shared intra-round rest | ⏳ Pending | Medium | Medium |
+| 30 | Routine builder — per-set variant picker | ✅ Done | High | High |
+| 31 | Padrão — between-exercise rest timer | ✅ Done | Medium | Medium |
+| 32 | Circuito — between-round rest timer + shared intra-round rest | ✅ Done | Medium | Medium |
 
 ---
 

@@ -198,8 +198,8 @@ export default function WorkoutClient({ session, initialSets }: Props) {
 
   // Track which sets are "active" (started but not yet completed) and their start time
   const [activeSetTimes, setActiveSetTimes] = useState<Record<string, Date>>({})
-  // Rest state: which set was just completed + when rest started
-  const [restState, setRestState] = useState<{ afterSetId: string; startedAt: Date } | null>(null)
+  // Rest state: which set was just completed + when rest started + how many seconds
+  const [restState, setRestState] = useState<{ afterSetId: string; startedAt: Date; restSeconds: number } | null>(null)
 
   // Unlock AudioContext on first user interaction (required on iOS)
   useEffect(() => {
@@ -246,6 +246,7 @@ export default function WorkoutClient({ session, initialSets }: Props) {
 
   async function completeSet(setId: string, targetReps: number) {
     const set = sets.find((s) => s.id === setId)
+    if (!set) return
     const isTimed = set?.routine_exercises?.exercises?.exercise_classes?.is_timed
     const activeStart = activeSetTimes[setId]
     const parsed = repOverrides[setId] ? parseInt(repOverrides[setId]) : targetReps
@@ -280,25 +281,43 @@ export default function WorkoutClient({ session, initialSets }: Props) {
       return
     }
 
-    // Start rest timer if this exercise has rest_seconds configured,
-    // but not after the very last set of the workout
-    const restSeconds = set?.routine_exercises?.rest_seconds
-    if (restSeconds && restSeconds > 0) {
-      let isLastSet: boolean
-      if (isCircuit) {
-        const maxRound = Math.max(...sets.map((s) => s.set_number))
-        const lastRoundSets = sets
-          .filter((s) => s.set_number === maxRound)
-          .sort((a, b) => b.routine_exercises.display_order - a.routine_exercises.display_order)
-        isLastSet = lastRoundSets[0]?.id === setId
-      } else {
-        const maxOrder = Math.max(...sets.map((s) => s.routine_exercises.display_order))
-        const lastExerciseSets = sets.filter((s) => s.routine_exercises.display_order === maxOrder)
-        const lastSetNumber = Math.max(...lastExerciseSets.map((s) => s.set_number))
-        isLastSet = lastExerciseSets.find((s) => s.set_number === lastSetNumber)?.id === setId
+    // Start rest timer after a completed set, but not after the very last set of the workout.
+    // The duration depends on mode and position within the workout.
+    if (isCircuit) {
+      const maxRound = Math.max(...sets.map((s) => s.set_number))
+      const lastRoundSets = sets
+        .filter((s) => s.set_number === maxRound)
+        .sort((a, b) => b.routine_exercises.display_order - a.routine_exercises.display_order)
+      const isLastSetOverall = lastRoundSets[0]?.id === setId
+      if (!isLastSetOverall) {
+        const currentRound = set.set_number
+        const maxOrderInRound = Math.max(
+          ...sets.filter((s) => s.set_number === currentRound).map((s) => s.routine_exercises.display_order)
+        )
+        const isLastOfRound = set.routine_exercises.display_order === maxOrderInRound
+        const restSecs = isLastOfRound
+          ? (session.routines?.round_rest_seconds ?? null)
+          : (session.routines?.circuit_rest_seconds ?? null)
+        if (restSecs && restSecs > 0) {
+          setRestState({ afterSetId: setId, startedAt: new Date(), restSeconds: restSecs })
+        }
       }
-      if (!isLastSet) {
-        setRestState({ afterSetId: setId, startedAt: new Date() })
+    } else {
+      const maxOrder = Math.max(...sets.map((s) => s.routine_exercises.display_order))
+      const lastExerciseSets = sets.filter((s) => s.routine_exercises.display_order === maxOrder)
+      const lastSetNumber = Math.max(...lastExerciseSets.map((s) => s.set_number))
+      const isLastSetOverall = lastExerciseSets.find((s) => s.set_number === lastSetNumber)?.id === setId
+      if (!isLastSetOverall) {
+        const blockKey = set.routine_exercises?.block_id ?? set.routine_exercise_id
+        const setsInBlock = sets.filter((s) => (s.routine_exercises?.block_id ?? s.routine_exercise_id) === blockKey)
+        const maxSetInBlock = Math.max(...setsInBlock.map((s) => s.set_number))
+        const isLastSetOfBlock = set.set_number === maxSetInBlock
+        const restSecs = isLastSetOfBlock
+          ? (session.routines?.inter_exercise_rest_seconds ?? set.routine_exercises.rest_seconds)
+          : set.routine_exercises.rest_seconds
+        if (restSecs && restSecs > 0) {
+          setRestState({ afterSetId: setId, startedAt: new Date(), restSeconds: restSecs })
+        }
       }
     }
   }
@@ -687,7 +706,7 @@ export default function WorkoutClient({ session, initialSets }: Props) {
                         {/* Rest timer row */}
                         {restState?.afterSetId === set.id && (
                           <RestTimer
-                            restSeconds={set.routine_exercises.rest_seconds ?? 60}
+                            restSeconds={restState!.restSeconds}
                             startedAt={restState.startedAt}
                             onEnd={() => endRest(set.id)}
                           />
@@ -851,7 +870,7 @@ export default function WorkoutClient({ session, initialSets }: Props) {
                         {/* Rest timer row shown after a completed set */}
                         {restState?.afterSetId === set.id && (
                           <RestTimer
-                            restSeconds={set.routine_exercises.rest_seconds ?? 60}
+                            restSeconds={restState!.restSeconds}
                             startedAt={restState.startedAt}
                             onEnd={() => endRest(set.id)}
                           />

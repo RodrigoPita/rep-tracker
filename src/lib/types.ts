@@ -25,6 +25,9 @@ export type Routine = {
   is_circuit: boolean
   archived_at: string | null
   created_at: string
+  inter_exercise_rest_seconds: number | null
+  round_rest_seconds: number | null
+  circuit_rest_seconds: number | null
 }
 
 export type RoutinePeriod = {
