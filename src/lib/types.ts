@@ -46,6 +46,10 @@ export type RoutineExercise = {
   target_seconds: number | null
   display_order: number
   rest_seconds: number | null
+  // per-set variant fields (null on legacy block-level rows)
+  set_number: number | null
+  block_id: string | null
+  exercise_class_id: string | null
 }
 
 export type WorkoutSession = {

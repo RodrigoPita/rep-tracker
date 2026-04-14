@@ -216,7 +216,9 @@ export default function WorkoutClient({ session, initialSets }: Props) {
     Object.fromEntries(
       Object.entries(
         initialSets.reduce<Record<string, boolean>>((acc, s) => {
-          if (s.weight_kg != null && s.routine_exercise_id) acc[s.routine_exercise_id] = true
+          // Key by block_id so the weight toggle is shared across all sets in the same block
+          const key = s.routine_exercises?.block_id ?? s.routine_exercise_id
+          if (s.weight_kg != null && key) acc[key] = true
           return acc
         }, {})
       )
@@ -330,11 +332,12 @@ export default function WorkoutClient({ session, initialSets }: Props) {
           .sort((a, b) => a.set_number - b.set_number || a.routine_exercises.display_order - b.routine_exercises.display_order)[0] ??
         null
     } else {
-      // Standard: next set of same exercise → first incomplete set of next exercise
+      // Standard: next set of same block → first incomplete set of next block
       nextSet =
         sets.find(
           (s) =>
-            s.routine_exercise_id === afterSet.routine_exercise_id &&
+            (s.routine_exercises?.block_id ?? s.routine_exercise_id) ===
+              (afterSet.routine_exercises?.block_id ?? afterSet.routine_exercise_id) &&
             s.set_number === afterSet.set_number + 1 &&
             !s.completed,
         ) ??
@@ -452,8 +455,9 @@ export default function WorkoutClient({ session, initialSets }: Props) {
   const progress = totalCount > 0 ? (completedCount / totalCount) * 100 : 0
   const allDone = completedCount === totalCount && totalCount > 0
 
+  // Group by block_id (per-set variant routines) or fall back to routine_exercise_id (legacy)
   const grouped = sets.reduce<Record<string, WorkoutSetWithExercise[]>>((acc, set) => {
-    const key = set.routine_exercise_id ?? 'unknown'
+    const key = set.routine_exercises?.block_id ?? set.routine_exercise_id ?? 'unknown'
     if (!acc[key]) acc[key] = []
     acc[key].push(set)
     return acc
@@ -509,12 +513,11 @@ export default function WorkoutClient({ session, initialSets }: Props) {
           <div className="flex flex-wrap gap-2">
             {exerciseGroups.map((exerciseSets) => {
               const exercise = exerciseSets[0].routine_exercises.exercises
-              const label = exerciseLabel(exercise)
-              const [, variant] = label.split(' — ')
+              const blockKey = exerciseSets[0].routine_exercises?.block_id ?? exerciseSets[0].routine_exercise_id ?? 'unknown'
               const done = exerciseSets.every((s) => s.completed)
               return (
                 <span
-                  key={exerciseSets[0].routine_exercise_id}
+                  key={blockKey}
                   className={[
                     'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium border transition-colors',
                     done
@@ -523,7 +526,7 @@ export default function WorkoutClient({ session, initialSets }: Props) {
                   ].join(' ')}
                 >
                   {done && <CheckCircle2 className="w-3 h-3" />}
-                  {variant}
+                  {exercise.exercise_classes.name}
                 </span>
               )
             })}
@@ -697,33 +700,31 @@ export default function WorkoutClient({ session, initialSets }: Props) {
             )
           })
         ) : (
-          // ── Standard mode: one card per exercise, sets inside ───────────────
+          // ── Standard mode: one card per block, sets inside ──────────────────
           exerciseGroups.map((exerciseSets) => {
             const exercise = exerciseSets[0].routine_exercises.exercises
             const groupDone = exerciseSets.every((s) => s.completed)
-            const label = exerciseLabel(exercise)
-            const [className, variant] = label.split(' — ')
+            const blockKey = exerciseSets[0].routine_exercises?.block_id ?? exerciseSets[0].routine_exercise_id ?? 'unknown'
+            // Header shows the class name; each set row shows its own variant
+            const className = exercise.exercise_classes.name
 
             return (
               <div
-                key={exerciseSets[0].routine_exercise_id}
+                key={blockKey}
                 className={[
                   'rounded-xl border bg-card card-elevated overflow-hidden transition-all',
                   groupDone ? 'border-green-300' : '',
                 ].join(' ')}
               >
                 <div className={['px-4 py-3 border-b flex items-center justify-between', groupDone ? 'bg-green-50 dark:bg-green-950/30' : 'bg-card'].join(' ')}>
-                  <div>
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{className}</p>
-                    <p className="font-semibold text-base">{variant ?? className}</p>
-                  </div>
+                  <p className="font-semibold text-base">{className}</p>
                   <div className="flex items-center gap-2 shrink-0">
                     {!groupDone && (
                       <button
-                        onClick={() => { const k = exerciseSets[0].routine_exercise_id ?? 'unknown'; setWeightExpanded((prev) => ({ ...prev, [k]: !prev[k] })) }}
+                        onClick={() => setWeightExpanded((prev) => ({ ...prev, [blockKey]: !prev[blockKey] }))}
                         className="text-xs text-muted-foreground hover:text-foreground transition-colors"
                       >
-                        {weightExpanded[exerciseSets[0].routine_exercise_id ?? 'unknown'] ? '− carga' : '＋ carga'}
+                        {weightExpanded[blockKey] ? '− carga' : '＋ carga'}
                       </button>
                     )}
                     {groupDone && <CheckCircle2 className="w-5 h-5 text-green-500" />}
@@ -737,6 +738,7 @@ export default function WorkoutClient({ session, initialSets }: Props) {
                     const hasActiveSet = Object.keys(activeSetTimes).length > 0
                     const prevIncomplete = exerciseSets.slice(0, setIndex).some(s => !s.completed)
                     const isBlocked = !set.completed && !isActive && (hasActiveSet || prevIncomplete)
+                    const variant = set.routine_exercises.exercises.variant
 
                     return (
                       <div key={set.id}>
@@ -772,11 +774,11 @@ export default function WorkoutClient({ session, initialSets }: Props) {
                             )}
                           </button>
 
-                          <span className={['text-xs font-medium w-10 shrink-0 sm:text-sm sm:w-14', set.completed ? 'text-muted-foreground' : ''].join(' ')}>
-                            S{set.set_number}
+                          <span className={['text-sm font-medium flex-shrink-0 max-w-[120px] truncate', set.completed ? 'text-muted-foreground' : ''].join(' ')}>
+                            {variant}
                           </span>
 
-                          {weightExpanded[set.routine_exercise_id ?? 'unknown'] && (
+                          {weightExpanded[blockKey] && (
                             <>
                               <Input
                                 type="number"

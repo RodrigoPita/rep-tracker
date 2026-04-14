@@ -9,7 +9,8 @@
     "lint": "eslint",
     "db:migrate": "node --env-file=.env.local scripts/db-migrate.mjs",
     "db:repair": "node --env-file=.env.local scripts/db-repair.mjs",
-    "db:reset": "node --env-file=.env.local scripts/reset-training-data.mjs"
+    "db:reset": "node --env-file=.env.local scripts/reset-training-data.mjs",
+    "db:delete-archived": "node --env-file=.env.local scripts/delete-archived-routines.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.3.0",
