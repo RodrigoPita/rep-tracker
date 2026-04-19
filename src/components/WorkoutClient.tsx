@@ -482,7 +482,9 @@ export default function WorkoutClient({ session, initialSets }: Props) {
     return acc
   }, {})
 
-  const exerciseGroups = Object.values(grouped)
+  const exerciseGroups = Object.values(grouped).sort(
+    (a, b) => a[0].routine_exercises.display_order - b[0].routine_exercises.display_order
+  )
   const totalExercises = exerciseGroups.length
   const totalPlannedSets = sets.length
 
@@ -527,30 +529,39 @@ export default function WorkoutClient({ session, initialSets }: Props) {
           </div>
         </div>
 
-        {/* Exercise preview strip */}
-        {exerciseGroups.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {exerciseGroups.map((exerciseSets) => {
-              const exercise = exerciseSets[0].routine_exercises.exercises
-              const blockKey = exerciseSets[0].routine_exercises?.block_id ?? exerciseSets[0].routine_exercise_id ?? 'unknown'
-              const done = exerciseSets.every((s) => s.completed)
-              return (
-                <span
-                  key={blockKey}
-                  className={[
-                    'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium border transition-colors',
-                    done
-                      ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-950/40 dark:text-green-400 dark:border-green-900'
-                      : 'bg-muted/50 text-muted-foreground border-transparent',
-                  ].join(' ')}
-                >
-                  {done && <CheckCircle2 className="w-3 h-3" />}
-                  {exercise.exercise_classes.name}
-                </span>
-              )
-            })}
-          </div>
-        )}
+        {/* Exercise preview strip — one chip per class, deduped */}
+        {exerciseGroups.length > 0 && (() => {
+          const classMap = new Map<string, WorkoutSetWithExercise[]>()
+          for (const group of exerciseGroups) {
+            const name = group[0].routine_exercises.exercises.exercise_classes.name
+            if (!classMap.has(name)) classMap.set(name, [])
+            classMap.get(name)!.push(...group)
+          }
+          return (
+            <div className="flex flex-wrap gap-2">
+              {[...classMap.entries()].map(([className, classSets]) => {
+                const allDone = classSets.every(s => s.completed)
+                const anyDone = classSets.some(s => s.completed)
+                return (
+                  <span
+                    key={className}
+                    className={[
+                      'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium border transition-colors',
+                      allDone
+                        ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-950/40 dark:text-green-400 dark:border-green-900'
+                        : anyDone
+                        ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-900'
+                        : 'bg-muted/50 text-muted-foreground border-transparent',
+                    ].join(' ')}
+                  >
+                    {allDone && <CheckCircle2 className="w-3 h-3" />}
+                    {className}
+                  </span>
+                )
+              })}
+            </div>
+          )
+        })()}
 
         {/* Exercise / round groups */}
         {isCircuit ? (
@@ -584,30 +595,31 @@ export default function WorkoutClient({ session, initialSets }: Props) {
                     const isBlocked = !set.completed && !isActive && (hasActiveSet || prevInRoundIncomplete)
                     const weightKey = set.routine_exercise_id ?? 'unknown'
 
+                    const handleRowAction = () => {
+                      if (isBlocked || set.completed) return
+                      if (isActive) completeSet(set.id, set.target_reps)
+                      else startSet(set.id)
+                    }
+
                     return (
                       <div key={set.id}>
-                        <div className={[
-                          'flex items-center gap-2 px-3 py-3 transition-colors sm:gap-3 sm:px-4',
-                          set.completed ? 'bg-green-50/60 dark:bg-green-950/20'
-                            : isActive ? 'bg-primary/5'
-                            : 'bg-card',
-                        ].join(' ')}>
+                        <div
+                          onClick={handleRowAction}
+                          className={[
+                            'flex items-center gap-2 px-3 py-3 transition-colors sm:gap-3 sm:px-4',
+                            set.completed ? 'bg-green-50/60 dark:bg-green-950/20'
+                              : isActive ? 'bg-primary/5'
+                              : 'bg-card',
+                            !isBlocked && !set.completed ? 'cursor-pointer' : '',
+                          ].join(' ')}>
                           <button
-                            disabled={isBlocked}
-                            onClick={() => {
-                              if (set.completed) {
-                                undoSet(set.id)
-                              } else if (isActive) {
-                                completeSet(set.id, set.target_reps)
-                              } else {
-                                startSet(set.id)
-                              }
-                            }}
+                            disabled={isBlocked || set.completed}
+                            onClick={(e) => { e.stopPropagation(); handleRowAction() }}
                             className={[
                               'shrink-0 transition-transform active:scale-90',
                               isBlocked ? 'opacity-30 cursor-not-allowed' : '',
                             ].join(' ')}
-                            aria-label={set.completed ? 'Desfazer série' : isActive ? 'Completar série' : 'Iniciar série'}
+                            aria-label={isActive ? 'Completar série' : 'Iniciar série'}
                           >
                             {set.completed ? (
                               <CheckCircle2 className="w-6 h-6 text-green-500" />
@@ -627,7 +639,7 @@ export default function WorkoutClient({ session, initialSets }: Props) {
                           {/* Weight toggle + input */}
                           {!set.completed && (
                             <button
-                              onClick={() => setWeightExpanded((prev) => ({ ...prev, [weightKey]: !prev[weightKey] }))}
+                              onClick={(e) => { e.stopPropagation(); setWeightExpanded((prev) => ({ ...prev, [weightKey]: !prev[weightKey] })) }}
                               className="text-xs text-muted-foreground hover:text-foreground transition-colors shrink-0"
                             >
                               {weightExpanded[weightKey] ? '− kg' : '＋ kg'}
@@ -639,6 +651,7 @@ export default function WorkoutClient({ session, initialSets }: Props) {
                                 type="number"
                                 placeholder="kg"
                                 value={weightOverrides[set.id] ?? (set.weight_kg != null ? String(set.weight_kg) : '')}
+                                onClick={(e) => e.stopPropagation()}
                                 onChange={(e) => {
                                   const val = e.target.value
                                   if (val === '' || parseFloat(val) >= 0) {
@@ -679,6 +692,7 @@ export default function WorkoutClient({ session, initialSets }: Props) {
                                 type="number"
                                 placeholder={String(set.target_reps)}
                                 value={repOverrides[set.id] ?? (set.actual_reps != null ? String(set.actual_reps) : '')}
+                                onClick={(e) => e.stopPropagation()}
                                 onChange={(e) => {
                                   const val = e.target.value
                                   if (val === '' || parseInt(val) >= 1) {
@@ -695,10 +709,16 @@ export default function WorkoutClient({ session, initialSets }: Props) {
                             </>
                           )}
 
-                          {/* Live elapsed timer on active rep-based set */}
-                          {isActive && activeStart && !set.routine_exercises.exercises.exercise_classes.is_timed && (
+                          {/* Live timer while active; final elapsed time after completion (rep-based only) */}
+                          {!set.routine_exercises.exercises.exercise_classes.is_timed && (
                             <span className="ml-auto">
-                              <SetTimer startedAt={activeStart} />
+                              {isActive && activeStart ? (
+                                <SetTimer startedAt={activeStart} />
+                              ) : set.completed && set.started_at && set.completed_at ? (
+                                <span className="text-xs font-mono text-muted-foreground tabular-nums">
+                                  {formatSeconds(Math.floor((new Date(set.completed_at).getTime() - new Date(set.started_at).getTime()) / 1000))}
+                                </span>
+                              ) : null}
                             </span>
                           )}
                         </div>
@@ -759,30 +779,31 @@ export default function WorkoutClient({ session, initialSets }: Props) {
                     const isBlocked = !set.completed && !isActive && (hasActiveSet || prevIncomplete)
                     const variant = set.routine_exercises.exercises.variant
 
+                    const handleRowAction = () => {
+                      if (isBlocked || set.completed) return
+                      if (isActive) completeSet(set.id, set.target_reps)
+                      else startSet(set.id)
+                    }
+
                     return (
                       <div key={set.id}>
-                        <div className={[
-                          'flex items-center gap-2 px-3 py-3 transition-colors sm:gap-3 sm:px-4',
-                          set.completed ? 'bg-green-50/60 dark:bg-green-950/20'
-                            : isActive ? 'bg-primary/5'
-                            : 'bg-card',
-                        ].join(' ')}>
+                        <div
+                          onClick={handleRowAction}
+                          className={[
+                            'flex items-center gap-2 px-3 py-3 transition-colors sm:gap-3 sm:px-4',
+                            set.completed ? 'bg-green-50/60 dark:bg-green-950/20'
+                              : isActive ? 'bg-primary/5'
+                              : 'bg-card',
+                            !isBlocked && !set.completed ? 'cursor-pointer' : '',
+                          ].join(' ')}>
                           <button
-                            disabled={isBlocked}
-                            onClick={() => {
-                              if (set.completed) {
-                                undoSet(set.id)
-                              } else if (isActive) {
-                                completeSet(set.id, set.target_reps)
-                              } else {
-                                startSet(set.id)
-                              }
-                            }}
+                            disabled={isBlocked || set.completed}
+                            onClick={(e) => { e.stopPropagation(); handleRowAction() }}
                             className={[
                               'shrink-0 transition-transform active:scale-90',
                               isBlocked ? 'opacity-30 cursor-not-allowed' : '',
                             ].join(' ')}
-                            aria-label={set.completed ? 'Desfazer série' : isActive ? 'Completar série' : 'Iniciar série'}
+                            aria-label={isActive ? 'Completar série' : 'Iniciar série'}
                           >
                             {set.completed ? (
                               <CheckCircle2 className="w-6 h-6 text-green-500" />
@@ -803,6 +824,7 @@ export default function WorkoutClient({ session, initialSets }: Props) {
                                 type="number"
                                 placeholder="kg"
                                 value={weightOverrides[set.id] ?? (set.weight_kg != null ? String(set.weight_kg) : '')}
+                                onClick={(e) => e.stopPropagation()}
                                 onChange={(e) => {
                                   const val = e.target.value
                                   if (val === '' || parseFloat(val) >= 0) {
@@ -843,6 +865,7 @@ export default function WorkoutClient({ session, initialSets }: Props) {
                                 type="number"
                                 placeholder={String(set.target_reps)}
                                 value={repOverrides[set.id] ?? (set.actual_reps != null ? String(set.actual_reps) : '')}
+                                onClick={(e) => e.stopPropagation()}
                                 onChange={(e) => {
                                   const val = e.target.value
                                   if (val === '' || parseInt(val) >= 1) {
@@ -859,10 +882,16 @@ export default function WorkoutClient({ session, initialSets }: Props) {
                             </>
                           )}
 
-                          {/* Live elapsed timer on active rep-based set */}
-                          {isActive && activeStart && !set.routine_exercises.exercises.exercise_classes.is_timed && (
+                          {/* Live timer while active; final elapsed time after completion (rep-based only) */}
+                          {!set.routine_exercises.exercises.exercise_classes.is_timed && (
                             <span className="ml-auto">
-                              <SetTimer startedAt={activeStart} />
+                              {isActive && activeStart ? (
+                                <SetTimer startedAt={activeStart} />
+                              ) : set.completed && set.started_at && set.completed_at ? (
+                                <span className="text-xs font-mono text-muted-foreground tabular-nums">
+                                  {formatSeconds(Math.floor((new Date(set.completed_at).getTime() - new Date(set.started_at).getTime()) / 1000))}
+                                </span>
+                              ) : null}
                             </span>
                           )}
                         </div>

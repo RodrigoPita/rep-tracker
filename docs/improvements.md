@@ -232,6 +232,9 @@
 | 30 | Routine builder — per-set variant picker | ✅ Done | High | High |
 | 31 | Padrão — between-exercise rest timer | ✅ Done | Medium | Medium |
 | 32 | Circuito — between-round rest timer + shared intra-round rest | ✅ Done | Medium | Medium |
+| 33 | Workout set — full-row tap target | ✅ Done | High | Low |
+| 34 | Workout set — show elapsed time after completion | ✅ Done | Medium | Low |
+| 35 | Workout — stable exercise block ordering | ✅ Done | High | Low |
 
 ---
 
@@ -337,6 +340,41 @@ Two circuit-specific timer additions; neither affects Padrão routines.
 - After completing a set that is not the last of its round: use `circuit_rest_seconds` (if set)
 - After completing the last set of a round (and there is a next round): use `round_rest_seconds` (if set)
 - After completing the last set of the last round: no rest timer
+
+---
+
+## 33. Workout Set — Full-Row Tap Target
+
+The set completion circle is too small a tap target, especially mid-workout with sweaty hands.
+
+**Change**
+- Make the entire set row (the `<div>` containing the circle, variant label, reps input, and timer) act as the tap/click handler for start → active → complete → undo transitions
+- The circle icon stays as a visual indicator but is no longer the only interactive element
+- Inputs (reps, weight) inside the row should still receive their own events — use `stopPropagation` where needed so tapping an input doesn't accidentally trigger the set action
+- Blocked sets should not be tappable row-wide (same `isBlocked` guard as today)
+
+---
+
+## 34. Workout Set — Show Final Elapsed Time After Completion
+
+While a set is active the stopwatch shows live elapsed time. Once the set is completed, that time disappears. It would be useful to see how long the set took.
+
+**Change**
+- After a set is marked complete, display the elapsed duration (derived from `started_at` → `completed_at`) in the same position as the live stopwatch
+- Format: same `formatSeconds` used elsewhere (e.g. "1:23" or "45s")
+- Only shown when both `started_at` and `completed_at` are present on the set
+- Applies to rep-based sets only — timed sets already surface their duration differently
+
+---
+
+## 35. Workout — Stable Exercise Block Ordering
+
+When resuming a mid-session workout the exercise blocks can appear in a different order than the routine was built with, because the sets are fetched ordered by `set_number` but grouping by `block_id` produces an order determined by whichever block's first set appears first in the result — which can vary.
+
+**Fix**
+- After grouping sets by `block_id`, sort the resulting groups by `display_order` (from `routine_exercises.display_order`) before rendering
+- `display_order` is already present on every `routine_exercise` row; no schema change needed
+- Applies to both Padrão and Circuito workout views
 
 ---
 

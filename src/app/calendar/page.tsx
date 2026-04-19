@@ -14,7 +14,7 @@ export default async function CalendarPage() {
         id, session_id, routine_exercise_id, set_number, target_reps,
         actual_reps, weight_kg, completed, completed_at,
         routine_exercises(
-          id, routine_id, exercise_id, sets, target_reps, display_order,
+          id, routine_id, exercise_id, sets, target_reps, display_order, block_id,
           exercises(id, variant, class_id, created_at, exercise_classes(name, is_timed))
         )
       )
