@@ -529,30 +529,39 @@ export default function WorkoutClient({ session, initialSets }: Props) {
           </div>
         </div>
 
-        {/* Exercise preview strip */}
-        {exerciseGroups.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {exerciseGroups.map((exerciseSets) => {
-              const exercise = exerciseSets[0].routine_exercises.exercises
-              const blockKey = exerciseSets[0].routine_exercises?.block_id ?? exerciseSets[0].routine_exercise_id ?? 'unknown'
-              const done = exerciseSets.every((s) => s.completed)
-              return (
-                <span
-                  key={blockKey}
-                  className={[
-                    'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium border transition-colors',
-                    done
-                      ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-950/40 dark:text-green-400 dark:border-green-900'
-                      : 'bg-muted/50 text-muted-foreground border-transparent',
-                  ].join(' ')}
-                >
-                  {done && <CheckCircle2 className="w-3 h-3" />}
-                  {exercise.exercise_classes.name}
-                </span>
-              )
-            })}
-          </div>
-        )}
+        {/* Exercise preview strip — one chip per class, deduped */}
+        {exerciseGroups.length > 0 && (() => {
+          const classMap = new Map<string, WorkoutSetWithExercise[]>()
+          for (const group of exerciseGroups) {
+            const name = group[0].routine_exercises.exercises.exercise_classes.name
+            if (!classMap.has(name)) classMap.set(name, [])
+            classMap.get(name)!.push(...group)
+          }
+          return (
+            <div className="flex flex-wrap gap-2">
+              {[...classMap.entries()].map(([className, classSets]) => {
+                const allDone = classSets.every(s => s.completed)
+                const anyDone = classSets.some(s => s.completed)
+                return (
+                  <span
+                    key={className}
+                    className={[
+                      'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium border transition-colors',
+                      allDone
+                        ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-950/40 dark:text-green-400 dark:border-green-900'
+                        : anyDone
+                        ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-900'
+                        : 'bg-muted/50 text-muted-foreground border-transparent',
+                    ].join(' ')}
+                  >
+                    {allDone && <CheckCircle2 className="w-3 h-3" />}
+                    {className}
+                  </span>
+                )
+              })}
+            </div>
+          )
+        })()}
 
         {/* Exercise / round groups */}
         {isCircuit ? (
