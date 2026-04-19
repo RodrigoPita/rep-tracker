@@ -482,7 +482,9 @@ export default function WorkoutClient({ session, initialSets }: Props) {
     return acc
   }, {})
 
-  const exerciseGroups = Object.values(grouped)
+  const exerciseGroups = Object.values(grouped).sort(
+    (a, b) => a[0].routine_exercises.display_order - b[0].routine_exercises.display_order
+  )
   const totalExercises = exerciseGroups.length
   const totalPlannedSets = sets.length
 
@@ -584,30 +586,31 @@ export default function WorkoutClient({ session, initialSets }: Props) {
                     const isBlocked = !set.completed && !isActive && (hasActiveSet || prevInRoundIncomplete)
                     const weightKey = set.routine_exercise_id ?? 'unknown'
 
+                    const handleRowAction = () => {
+                      if (isBlocked || set.completed) return
+                      if (isActive) completeSet(set.id, set.target_reps)
+                      else startSet(set.id)
+                    }
+
                     return (
                       <div key={set.id}>
-                        <div className={[
-                          'flex items-center gap-2 px-3 py-3 transition-colors sm:gap-3 sm:px-4',
-                          set.completed ? 'bg-green-50/60 dark:bg-green-950/20'
-                            : isActive ? 'bg-primary/5'
-                            : 'bg-card',
-                        ].join(' ')}>
+                        <div
+                          onClick={handleRowAction}
+                          className={[
+                            'flex items-center gap-2 px-3 py-3 transition-colors sm:gap-3 sm:px-4',
+                            set.completed ? 'bg-green-50/60 dark:bg-green-950/20'
+                              : isActive ? 'bg-primary/5'
+                              : 'bg-card',
+                            !isBlocked && !set.completed ? 'cursor-pointer' : '',
+                          ].join(' ')}>
                           <button
-                            disabled={isBlocked}
-                            onClick={() => {
-                              if (set.completed) {
-                                undoSet(set.id)
-                              } else if (isActive) {
-                                completeSet(set.id, set.target_reps)
-                              } else {
-                                startSet(set.id)
-                              }
-                            }}
+                            disabled={isBlocked || set.completed}
+                            onClick={(e) => { e.stopPropagation(); handleRowAction() }}
                             className={[
                               'shrink-0 transition-transform active:scale-90',
                               isBlocked ? 'opacity-30 cursor-not-allowed' : '',
                             ].join(' ')}
-                            aria-label={set.completed ? 'Desfazer série' : isActive ? 'Completar série' : 'Iniciar série'}
+                            aria-label={isActive ? 'Completar série' : 'Iniciar série'}
                           >
                             {set.completed ? (
                               <CheckCircle2 className="w-6 h-6 text-green-500" />
@@ -627,7 +630,7 @@ export default function WorkoutClient({ session, initialSets }: Props) {
                           {/* Weight toggle + input */}
                           {!set.completed && (
                             <button
-                              onClick={() => setWeightExpanded((prev) => ({ ...prev, [weightKey]: !prev[weightKey] }))}
+                              onClick={(e) => { e.stopPropagation(); setWeightExpanded((prev) => ({ ...prev, [weightKey]: !prev[weightKey] })) }}
                               className="text-xs text-muted-foreground hover:text-foreground transition-colors shrink-0"
                             >
                               {weightExpanded[weightKey] ? '− kg' : '＋ kg'}
@@ -639,6 +642,7 @@ export default function WorkoutClient({ session, initialSets }: Props) {
                                 type="number"
                                 placeholder="kg"
                                 value={weightOverrides[set.id] ?? (set.weight_kg != null ? String(set.weight_kg) : '')}
+                                onClick={(e) => e.stopPropagation()}
                                 onChange={(e) => {
                                   const val = e.target.value
                                   if (val === '' || parseFloat(val) >= 0) {
@@ -679,6 +683,7 @@ export default function WorkoutClient({ session, initialSets }: Props) {
                                 type="number"
                                 placeholder={String(set.target_reps)}
                                 value={repOverrides[set.id] ?? (set.actual_reps != null ? String(set.actual_reps) : '')}
+                                onClick={(e) => e.stopPropagation()}
                                 onChange={(e) => {
                                   const val = e.target.value
                                   if (val === '' || parseInt(val) >= 1) {
@@ -695,10 +700,16 @@ export default function WorkoutClient({ session, initialSets }: Props) {
                             </>
                           )}
 
-                          {/* Live elapsed timer on active rep-based set */}
-                          {isActive && activeStart && !set.routine_exercises.exercises.exercise_classes.is_timed && (
+                          {/* Live timer while active; final elapsed time after completion (rep-based only) */}
+                          {!set.routine_exercises.exercises.exercise_classes.is_timed && (
                             <span className="ml-auto">
-                              <SetTimer startedAt={activeStart} />
+                              {isActive && activeStart ? (
+                                <SetTimer startedAt={activeStart} />
+                              ) : set.completed && set.started_at && set.completed_at ? (
+                                <span className="text-xs font-mono text-muted-foreground tabular-nums">
+                                  {formatSeconds(Math.floor((new Date(set.completed_at).getTime() - new Date(set.started_at).getTime()) / 1000))}
+                                </span>
+                              ) : null}
                             </span>
                           )}
                         </div>
@@ -759,30 +770,31 @@ export default function WorkoutClient({ session, initialSets }: Props) {
                     const isBlocked = !set.completed && !isActive && (hasActiveSet || prevIncomplete)
                     const variant = set.routine_exercises.exercises.variant
 
+                    const handleRowAction = () => {
+                      if (isBlocked || set.completed) return
+                      if (isActive) completeSet(set.id, set.target_reps)
+                      else startSet(set.id)
+                    }
+
                     return (
                       <div key={set.id}>
-                        <div className={[
-                          'flex items-center gap-2 px-3 py-3 transition-colors sm:gap-3 sm:px-4',
-                          set.completed ? 'bg-green-50/60 dark:bg-green-950/20'
-                            : isActive ? 'bg-primary/5'
-                            : 'bg-card',
-                        ].join(' ')}>
+                        <div
+                          onClick={handleRowAction}
+                          className={[
+                            'flex items-center gap-2 px-3 py-3 transition-colors sm:gap-3 sm:px-4',
+                            set.completed ? 'bg-green-50/60 dark:bg-green-950/20'
+                              : isActive ? 'bg-primary/5'
+                              : 'bg-card',
+                            !isBlocked && !set.completed ? 'cursor-pointer' : '',
+                          ].join(' ')}>
                           <button
-                            disabled={isBlocked}
-                            onClick={() => {
-                              if (set.completed) {
-                                undoSet(set.id)
-                              } else if (isActive) {
-                                completeSet(set.id, set.target_reps)
-                              } else {
-                                startSet(set.id)
-                              }
-                            }}
+                            disabled={isBlocked || set.completed}
+                            onClick={(e) => { e.stopPropagation(); handleRowAction() }}
                             className={[
                               'shrink-0 transition-transform active:scale-90',
                               isBlocked ? 'opacity-30 cursor-not-allowed' : '',
                             ].join(' ')}
-                            aria-label={set.completed ? 'Desfazer série' : isActive ? 'Completar série' : 'Iniciar série'}
+                            aria-label={isActive ? 'Completar série' : 'Iniciar série'}
                           >
                             {set.completed ? (
                               <CheckCircle2 className="w-6 h-6 text-green-500" />
@@ -803,6 +815,7 @@ export default function WorkoutClient({ session, initialSets }: Props) {
                                 type="number"
                                 placeholder="kg"
                                 value={weightOverrides[set.id] ?? (set.weight_kg != null ? String(set.weight_kg) : '')}
+                                onClick={(e) => e.stopPropagation()}
                                 onChange={(e) => {
                                   const val = e.target.value
                                   if (val === '' || parseFloat(val) >= 0) {
@@ -843,6 +856,7 @@ export default function WorkoutClient({ session, initialSets }: Props) {
                                 type="number"
                                 placeholder={String(set.target_reps)}
                                 value={repOverrides[set.id] ?? (set.actual_reps != null ? String(set.actual_reps) : '')}
+                                onClick={(e) => e.stopPropagation()}
                                 onChange={(e) => {
                                   const val = e.target.value
                                   if (val === '' || parseInt(val) >= 1) {
@@ -859,10 +873,16 @@ export default function WorkoutClient({ session, initialSets }: Props) {
                             </>
                           )}
 
-                          {/* Live elapsed timer on active rep-based set */}
-                          {isActive && activeStart && !set.routine_exercises.exercises.exercise_classes.is_timed && (
+                          {/* Live timer while active; final elapsed time after completion (rep-based only) */}
+                          {!set.routine_exercises.exercises.exercise_classes.is_timed && (
                             <span className="ml-auto">
-                              <SetTimer startedAt={activeStart} />
+                              {isActive && activeStart ? (
+                                <SetTimer startedAt={activeStart} />
+                              ) : set.completed && set.started_at && set.completed_at ? (
+                                <span className="text-xs font-mono text-muted-foreground tabular-nums">
+                                  {formatSeconds(Math.floor((new Date(set.completed_at).getTime() - new Date(set.started_at).getTime()) / 1000))}
+                                </span>
+                              ) : null}
                             </span>
                           )}
                         </div>
