@@ -43,7 +43,7 @@ function playBeep() {
     osc.frequency.value = 880
     const t = ctx.currentTime + i * 0.35
     gain.gain.setValueAtTime(0, t)
-    gain.gain.linearRampToValueAtTime(0.3, t + 0.02)
+    gain.gain.linearRampToValueAtTime(0.8, t + 0.02)
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.25)
     osc.start(t)
     osc.stop(t + 0.25)
@@ -371,27 +371,6 @@ export default function WorkoutClient({ session, initialSets }: Props) {
     setActiveSetTimes((prev) => ({ ...prev, [nextSet.id]: now }))
     setSets((prev) => prev.map((s) => s.id === nextSet.id ? { ...s, started_at: nowIso } : s))
     await supabase.from('workout_sets').update({ started_at: nowIso }).eq('id', nextSet.id)
-  }
-
-  async function undoSet(setId: string) {
-    // Cancel rest if it was triggered by this set
-    if (restState?.afterSetId === setId) setRestState(null)
-
-    setSets((prev) =>
-      prev.map((s) =>
-        s.id === setId
-          ? { ...s, completed: false, actual_reps: null, weight_kg: null, completed_at: null, started_at: null, rest_ended_at: null }
-          : s
-      )
-    )
-    const { error } = await supabase
-      .from('workout_sets')
-      .update({ completed: false, actual_reps: null, weight_kg: null, completed_at: null, started_at: null, rest_ended_at: null })
-      .eq('id', setId)
-    if (error) {
-      setSets(initialSets)
-      toast.error('Não foi possível desfazer a série. Tente novamente.')
-    }
   }
 
   async function finishWorkout() {
