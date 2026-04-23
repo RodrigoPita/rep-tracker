@@ -235,6 +235,7 @@
 | 33 | Workout set — full-row tap target | ✅ Done | High | Low |
 | 34 | Workout set — show elapsed time after completion | ✅ Done | Medium | Low |
 | 35 | Workout — stable exercise block ordering | ✅ Done | High | Low |
+| 36 | Service layer refactor | ⏳ Pending | Medium | Medium |
 
 ---
 
@@ -390,3 +391,26 @@ Follow the style of [chord-recognition](https://github.com/RodrigoPita/chord-rec
 - Running Locally (prerequisites, clone, install, env vars, migrate, dev)
 - Project structure
 - `Made with ❤️ by Rodrigo Pita` footer
+
+---
+
+## 36. Service Layer Refactor
+
+All Supabase queries are currently scattered across page.tsx server components, client components, and server actions. Extract them into a dedicated `lib/services/` module so data access is isolated from rendering.
+
+**Structure**
+- `lib/services/workout.ts` — `getWorkoutSession`, `getWorkoutSets`, `startSet`, `completeSet`, `finishWorkout`
+- `lib/services/routines.ts` — `getRoutines`, `getRoutine`, `createRoutine`, `updateRoutine`, `archiveRoutine`
+- `lib/services/sessions.ts` — `getSessionsByDate`, `getSessionHistory`
+- `lib/services/exercises.ts` — `getExerciseClasses`, `getExercises`, `createExercise`
+
+**Rules**
+- Service functions are plain async functions — no React, no hooks, no UI imports
+- All `supabase` client calls live inside service functions; nothing outside `lib/services/` imports from `@supabase/supabase-js` directly
+- Server components call service functions directly; server actions call service functions and return results to client components
+- Types returned by service functions are defined in `lib/types.ts` as before
+
+**Why**
+- Makes queries testable in isolation (mock the service, not Supabase)
+- Single place to change a query shape — no hunting across components
+- Natural stepping stone toward a REST API layer if a second client (mobile app) is ever needed
