@@ -236,6 +236,8 @@
 | 34 | Workout set — show elapsed time after completion | ✅ Done | Medium | Low |
 | 35 | Workout — stable exercise block ordering | ✅ Done | High | Low |
 | 36 | Service layer refactor | ⏳ Pending | Medium | Medium |
+| 37 | Bi-sets | ✅ Done | High | High |
+| 38 | Routine session tables + CSV export | ⏳ Pending | Medium | Medium |
 
 ---
 
@@ -414,3 +416,55 @@ All Supabase queries are currently scattered across page.tsx server components, 
 - Makes queries testable in isolation (mock the service, not Supabase)
 - Single place to change a query shape — no hunting across components
 - Natural stepping stone toward a REST API layer if a second client (mobile app) is ever needed
+
+---
+
+## 37. Bi-sets ✅
+
+A block can pair a **main** exercise class with a **secondary** class performed back-to-back with no rest between them — the block is titled by the main exercise. Example: *Agachamento (bi-set + Cadeirinha)* — each set does an Agachamento set immediately followed by a Cadeirinha set, then rest.
+
+**Schema impact**
+- Migration `014_bisets.sql`: `superset_position smallint NOT NULL DEFAULT 0` on `routine_exercises`
+- A bi-set block = the same `block_id` with two rows per set number: `superset_position` `0` (main) and `1` (secondary). Play/sort order within a block is `(set_number, superset_position)`.
+- "Is a bi-set" and the secondary class are **derived** from the presence of position-1 rows — no extra flag.
+- `workout_sets` is unchanged → analytics, calendar, achievements, and history keep working with zero changes. Each side has its own class/variant and its own reps/seconds target.
+
+**Routine builder**
+- Each set row shows the main variant dropdown; a **"+ Bi-set"** control attaches a secondary class (existing classes only), adding a second variant dropdown per set and an independent secondary config (reps or seconds, respecting the secondary class's `is_timed`).
+- Rest is shared per block and fires only after each pair. Removing the secondary soft-deletes its rows.
+
+**Workout logic**
+- Sets ordered `(set_number, superset_position)`; sequential blocking enforces main → secondary → next pair.
+- No rest after the main set of a pair (user taps the secondary); rest fires after the secondary using the block's `rest_seconds` (or `inter_exercise_rest_seconds` on the last pair of the block; none on the last set overall).
+- Each row shows its own class + variant; the secondary row is indented with a `+` marker. The preview strip gives the secondary class its own chip.
+
+**Scope**
+- Padrão mode only (switching a bi-set routine to Circuito strips secondaries). Exactly two exercises per bi-set; the `superset_position` column leaves room for tri-sets later.
+
+---
+
+## 38. Routine Session Tables + CSV Export
+
+A per-routine tabular view of recorded training data, with one **table block per routine** (e.g. "I am back!", "Step Two"), each row = one completed workout session. Export any table to CSV.
+
+**Layout**
+- New view (e.g. a "Tabelas" / "Histórico" page, or a section under each routine) listing every routine the user has, each with its own table.
+- Only routines with recorded sessions need a table; archived routines still appear (their history is preserved).
+- Sessions sorted most-recent first.
+
+**Row granularity (design decision)**
+- **Default: one row per session (summary).** Columns: date, duration, sets completed, total reps, total volume (Σ reps×weight where weight present), most-trained class. Compact and mobile-friendly.
+- **Optional drill-down: one row per set** (date, exercise class, variant, set #, reps/seconds, weight, rest taken) — either an expandable detail under each session row or a per-session "ver séries" view. Heavier; can be a follow-up.
+
+**CSV export**
+- A "Exportar CSV" button per routine table (and optionally an "export all").
+- Client-side serialization (no new endpoint): build the CSV string from the already-fetched rows and trigger a download via a Blob + object URL.
+- Escape commas/quotes/newlines; UTF-8 with BOM so Excel renders accents (Flexão, Cadeirinha) correctly.
+- Filename e.g. `<routine-name>-YYYY-MM-DD.csv`.
+
+**Data source**
+- Reads `workout_sessions` (date, completed_at) joined to `workout_sets` (actual_reps, weight_kg, started_at, completed_at) and `routine_exercises → exercises → exercise_classes` for names. Duration derived from first set `started_at` → last set `completed_at` (same rule used elsewhere).
+- **No schema changes.** Mostly a read query + table render + a small CSV helper.
+
+**Notes**
+- Reuse existing helpers (`exerciseLabel`, duration formatting) and keep tables responsive (horizontal scroll on narrow viewports).
