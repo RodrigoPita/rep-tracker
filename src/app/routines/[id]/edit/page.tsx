@@ -14,7 +14,8 @@ export default async function EditRoutinePage({ params }: { params: Promise<{ id
       .is('deleted_at', null)
       .not('set_number', 'is', null)   // only per-set rows
       .order('display_order')
-      .order('set_number'),
+      .order('set_number')
+      .order('superset_position'),
     db.from('exercises').select('*, exercise_classes(*)').order('exercise_classes(name)'),
   ])
 
@@ -29,7 +30,13 @@ export default async function EditRoutinePage({ params }: { params: Promise<{ id
   }
 
   const initialBlocks = Array.from(blockMap.entries()).map(([blockId, rows], i) => {
-    const first = rows[0]
+    // Split into main (superset_position 0) and secondary (1) rows; pair by set_number
+    const mainRows = rows.filter((re) => (re.superset_position ?? 0) === 0)
+    const secondaryRows = rows.filter((re) => (re.superset_position ?? 0) === 1)
+    const secondaryBySet = new Map(secondaryRows.map((re) => [re.set_number, re]))
+    const first = mainRows[0]
+    const secFirst = secondaryRows[0]
+
     return {
       draftId: crypto.randomUUID(),
       blockId,
@@ -40,12 +47,31 @@ export default async function EditRoutinePage({ params }: { params: Promise<{ id
       targetSeconds: first.target_seconds ?? null,
       restSeconds: first.rest_seconds ?? null,
       displayOrder: i,
-      setRows: rows.map((re) => ({
-        id: re.id,
-        draftId: crypto.randomUUID(),
-        exerciseId: re.exercise_id,
-        variantLabel: re.exercises.variant,
-      })),
+      secondary: secFirst
+        ? {
+            classId: secFirst.exercise_class_id ?? secFirst.exercises.class_id,
+            className: secFirst.exercises.exercise_classes.name,
+            isTimed: secFirst.exercises.exercise_classes.is_timed,
+            targetReps: secFirst.target_reps,
+            targetSeconds: secFirst.target_seconds ?? null,
+          }
+        : undefined,
+      setRows: mainRows.map((re) => {
+        const sec = secondaryBySet.get(re.set_number)
+        return {
+          id: re.id,
+          draftId: crypto.randomUUID(),
+          exerciseId: re.exercise_id,
+          variantLabel: re.exercises.variant,
+          ...(sec
+            ? {
+                secondaryId: sec.id,
+                secondaryExerciseId: sec.exercise_id,
+                secondaryVariantLabel: sec.exercises.variant,
+              }
+            : {}),
+        }
+      }),
     }
   })
 

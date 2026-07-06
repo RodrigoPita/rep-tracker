@@ -32,7 +32,8 @@ import { GripVertical, Plus, Timer, X } from 'lucide-react'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-/** One set row within an exercise block */
+/** One set row within an exercise block. In a bi-set it holds both the main
+ *  variant and the paired secondary variant for that set number. */
 type SetDraft = {
   /** routine_exercise.id — present for rows loaded from DB, absent for newly added ones */
   id?: string
@@ -40,9 +41,22 @@ type SetDraft = {
   draftId: string
   exerciseId: string
   variantLabel: string
+  /** routine_exercise.id of the paired secondary row (bi-set only) */
+  secondaryId?: string
+  secondaryExerciseId?: string
+  secondaryVariantLabel?: string
 }
 
-/** One exercise block (class + N set rows) */
+/** Config for the secondary exercise of a bi-set block */
+type SideConfig = {
+  classId: string
+  className: string
+  isTimed: boolean
+  targetReps: number
+  targetSeconds: number | null
+}
+
+/** One exercise block (class + N set rows), optionally a bi-set with a secondary */
 type BlockDraft = {
   /** Stable client-side key used for outer DnD */
   draftId: string
@@ -56,6 +70,8 @@ type BlockDraft = {
   restSeconds: number | null
   displayOrder: number
   setRows: SetDraft[]
+  /** When present, the block is a bi-set: each set pairs main + secondary with no rest between */
+  secondary?: SideConfig
 }
 
 export type RoutineFormInitialData = {
@@ -81,7 +97,10 @@ type SortableSetRowProps = {
   setIndex: number
   variantsForClass: ExerciseWithClass[]
   isTimed: boolean
+  secondary?: SideConfig
+  secondaryVariants: ExerciseWithClass[]
   onChangeVariant: (blockIndex: number, setIndex: number, exerciseId: string, variantLabel: string) => void
+  onChangeSecondaryVariant: (blockIndex: number, setIndex: number, exerciseId: string, variantLabel: string) => void
   onRemove: (blockIndex: number, setIndex: number) => void
   canRemove: boolean
 }
@@ -92,7 +111,10 @@ function SortableSetRow({
   setIndex,
   variantsForClass,
   isTimed,
+  secondary,
+  secondaryVariants,
   onChangeVariant,
+  onChangeSecondaryVariant,
   onRemove,
   canRemove,
 }: SortableSetRowProps) {
@@ -108,10 +130,10 @@ function SortableSetRow({
   }
 
   return (
-    <div ref={setNodeRef} style={style} className="flex items-center gap-2">
+    <div ref={setNodeRef} style={style} className="flex items-start gap-2">
       <button
         type="button"
-        className="text-muted-foreground/40 hover:text-muted-foreground cursor-grab active:cursor-grabbing shrink-0 touch-none"
+        className="text-muted-foreground/40 hover:text-muted-foreground cursor-grab active:cursor-grabbing shrink-0 touch-none mt-1.5"
         aria-label="Arrastar para reordenar série"
         {...attributes}
         {...listeners}
@@ -119,44 +141,84 @@ function SortableSetRow({
         <GripVertical className="w-3.5 h-3.5" />
       </button>
 
-      <span className="text-xs text-muted-foreground w-5 shrink-0 tabular-nums">
+      <span className="text-xs text-muted-foreground w-5 shrink-0 tabular-nums mt-2">
         S{setIndex + 1}
       </span>
 
-      <select
-        value={setRow.exerciseId}
-        onChange={(e) => {
-          const ex = variantsForClass.find((v) => v.id === e.target.value)
-          if (ex) onChangeVariant(blockIndex, setIndex, ex.id, ex.variant)
-          else onChangeVariant(blockIndex, setIndex, '', '')
-        }}
-        className={[
-          'flex-1 h-8 rounded-md border bg-background px-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring',
-          setRow.exerciseId === ''
-            ? 'border-destructive text-muted-foreground'
-            : 'border-input',
-        ].join(' ')}
-        aria-label={`Variante da série ${setIndex + 1}`}
-      >
-        <option value="">—</option>
-        {variantsForClass.map((v) => (
-          <option key={v.id} value={v.id}>
-            {v.variant}
-          </option>
-        ))}
-      </select>
+      <div className="flex-1 space-y-1.5">
+        {/* Main variant */}
+        <div className="flex items-center gap-2">
+          <select
+            value={setRow.exerciseId}
+            onChange={(e) => {
+              const ex = variantsForClass.find((v) => v.id === e.target.value)
+              if (ex) onChangeVariant(blockIndex, setIndex, ex.id, ex.variant)
+              else onChangeVariant(blockIndex, setIndex, '', '')
+            }}
+            className={[
+              'flex-1 h-8 rounded-md border bg-background px-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring',
+              setRow.exerciseId === ''
+                ? 'border-destructive text-muted-foreground'
+                : 'border-input',
+            ].join(' ')}
+            aria-label={`Variante da série ${setIndex + 1}`}
+          >
+            <option value="">—</option>
+            {variantsForClass.map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.variant}
+              </option>
+            ))}
+          </select>
 
-      {isTimed && (
-        <span className="inline-flex items-center gap-0.5 text-xs text-muted-foreground border rounded-full px-1.5 py-0.5 shrink-0">
-          <Timer className="w-3 h-3" /> tempo
-        </span>
-      )}
+          {isTimed && (
+            <span className="inline-flex items-center gap-0.5 text-xs text-muted-foreground border rounded-full px-1.5 py-0.5 shrink-0">
+              <Timer className="w-3 h-3" /> tempo
+            </span>
+          )}
+        </div>
+
+        {/* Secondary variant (bi-set) */}
+        {secondary && (
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-muted-foreground shrink-0 w-3 text-center">+</span>
+            <select
+              value={setRow.secondaryExerciseId ?? ''}
+              onChange={(e) => {
+                const ex = secondaryVariants.find((v) => v.id === e.target.value)
+                if (ex) onChangeSecondaryVariant(blockIndex, setIndex, ex.id, ex.variant)
+                else onChangeSecondaryVariant(blockIndex, setIndex, '', '')
+              }}
+              className={[
+                'flex-1 h-8 rounded-md border bg-background px-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring',
+                !setRow.secondaryExerciseId
+                  ? 'border-destructive text-muted-foreground'
+                  : 'border-input',
+              ].join(' ')}
+              aria-label={`Variante secundária da série ${setIndex + 1}`}
+            >
+              <option value="">—</option>
+              {secondaryVariants.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {v.variant}
+                </option>
+              ))}
+            </select>
+
+            {secondary.isTimed && (
+              <span className="inline-flex items-center gap-0.5 text-xs text-muted-foreground border rounded-full px-1.5 py-0.5 shrink-0">
+                <Timer className="w-3 h-3" /> tempo
+              </span>
+            )}
+          </div>
+        )}
+      </div>
 
       {canRemove && (
         <button
           type="button"
           onClick={() => onRemove(blockIndex, setIndex)}
-          className="text-muted-foreground/40 hover:text-destructive transition-colors shrink-0"
+          className="text-muted-foreground/40 hover:text-destructive transition-colors shrink-0 mt-1.5"
           aria-label="Remover série"
         >
           <X className="w-3.5 h-3.5" />
@@ -168,14 +230,21 @@ function SortableSetRow({
 
 // ── Outer sortable block card ──────────────────────────────────────────────────
 
+type ClassInfo = { classId: string; className: string; isTimed: boolean }
+
 type SortableBlockProps = {
   block: BlockDraft
   blockIndex: number
   variantsByClass: Record<string, ExerciseWithClass[]>
+  allClasses: ClassInfo[]
   sensors: ReturnType<typeof useSensors>
   isCircuit: boolean
   onUpdateConfig: (blockIndex: number, field: 'targetReps' | 'restSeconds' | 'targetSeconds', value: number | null) => void
+  onUpdateSecondaryConfig: (blockIndex: number, field: 'targetReps' | 'targetSeconds', value: number | null) => void
   onChangeVariant: (blockIndex: number, setIndex: number, exerciseId: string, variantLabel: string) => void
+  onChangeSecondaryVariant: (blockIndex: number, setIndex: number, exerciseId: string, variantLabel: string) => void
+  onAddSecondary: (blockIndex: number, classInfo: ClassInfo) => void
+  onRemoveSecondary: (blockIndex: number) => void
   onAddSet: (blockIndex: number) => void
   onRemoveSet: (blockIndex: number, setIndex: number) => void
   onRemoveBlock: (blockIndex: number) => void
@@ -186,16 +255,24 @@ function SortableBlock({
   block,
   blockIndex,
   variantsByClass,
+  allClasses,
   sensors,
   isCircuit,
   onUpdateConfig,
+  onUpdateSecondaryConfig,
   onChangeVariant,
+  onChangeSecondaryVariant,
+  onAddSecondary,
+  onRemoveSecondary,
   onAddSet,
   onRemoveSet,
   onRemoveBlock,
   onInnerDragEnd,
 }: SortableBlockProps) {
   const [repsInput, setRepsInput] = useState<string>(String(block.targetReps))
+  const [secRepsInput, setSecRepsInput] = useState<string>(String(block.secondary?.targetReps ?? 10))
+  const [showSecPicker, setShowSecPicker] = useState(false)
+  const [secSearch, setSecSearch] = useState('')
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: block.draftId,
   })
@@ -208,6 +285,10 @@ function SortableBlock({
   }
 
   const variants = variantsByClass[block.classId] ?? []
+  const secondaryVariants = block.secondary ? (variantsByClass[block.secondary.classId] ?? []) : []
+  const filteredSecClasses = allClasses.filter((c) =>
+    c.classId !== block.classId && normalize(c.className).includes(normalize(secSearch))
+  )
 
   return (
     <div ref={setNodeRef} style={style}>
@@ -292,6 +373,62 @@ function SortableBlock({
             )}
           </div>
 
+          {/* Row 2b: secondary exercise config (bi-set, standard mode only) */}
+          {!isCircuit && block.secondary && (
+            <div className="pl-6 space-y-2 rounded-lg border border-dashed border-border bg-muted/30 p-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-muted-foreground shrink-0">Bi-set +</span>
+                <span className="text-sm font-medium flex-1">{block.secondary.className}</span>
+                <button
+                  type="button"
+                  onClick={() => onRemoveSecondary(blockIndex)}
+                  className="text-muted-foreground/50 hover:text-destructive transition-colors shrink-0"
+                  aria-label="Remover bi-set"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <div className="flex items-center gap-2">
+                {block.secondary.isTimed ? (
+                  <div className="flex items-center gap-1">
+                    <Input
+                      type="number"
+                      value={block.secondary.targetSeconds ?? ''}
+                      onChange={(e) => {
+                        const v = parseInt(e.target.value)
+                        onUpdateSecondaryConfig(blockIndex, 'targetSeconds', e.target.value === '' || isNaN(v) ? null : v)
+                      }}
+                      placeholder="30"
+                      className="w-14 h-8 text-center"
+                      min={1}
+                    />
+                    <span className="text-sm text-muted-foreground">{setUnit(true)}</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1">
+                    <Input
+                      type="number"
+                      value={secRepsInput}
+                      onChange={(e) => {
+                        setSecRepsInput(e.target.value)
+                        const v = parseInt(e.target.value)
+                        if (!isNaN(v) && v >= 1) onUpdateSecondaryConfig(blockIndex, 'targetReps', v)
+                      }}
+                      onBlur={() => {
+                        const v = parseInt(secRepsInput)
+                        if (isNaN(v) || v < 1) setSecRepsInput(String(block.secondary?.targetReps ?? 10))
+                      }}
+                      className="w-14 h-8 text-center"
+                      min={1}
+                    />
+                    <span className="text-sm text-muted-foreground">{setUnit(false)}</span>
+                  </div>
+                )}
+                <span className="text-xs text-muted-foreground">sem descanso entre o par</span>
+              </div>
+            </div>
+          )}
+
           {/* Row 3: variant picker */}
           {isCircuit ? (
             // Circuit mode: single variant choice applied to all rounds
@@ -335,7 +472,10 @@ function SortableBlock({
                       setIndex={setIndex}
                       variantsForClass={variants}
                       isTimed={block.isTimed}
+                      secondary={block.secondary}
+                      secondaryVariants={secondaryVariants}
                       onChangeVariant={onChangeVariant}
+                      onChangeSecondaryVariant={onChangeSecondaryVariant}
                       onRemove={onRemoveSet}
                       canRemove={block.setRows.length > 1}
                     />
@@ -343,14 +483,57 @@ function SortableBlock({
                 </SortableContext>
               </DndContext>
 
-              <button
-                type="button"
-                onClick={() => onAddSet(blockIndex)}
-                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors pt-0.5"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                Série
-              </button>
+              <div className="flex items-center gap-3 pt-0.5">
+                <button
+                  type="button"
+                  onClick={() => onAddSet(blockIndex)}
+                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  Série
+                </button>
+
+                {!block.secondary && (
+                  <button
+                    type="button"
+                    onClick={() => { setShowSecPicker((v) => !v); setSecSearch('') }}
+                    className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Bi-set
+                  </button>
+                )}
+              </div>
+
+              {/* Secondary class picker */}
+              {!block.secondary && showSecPicker && (
+                <div className="border rounded-md overflow-hidden">
+                  <div className="p-2 border-b">
+                    <Input
+                      autoFocus
+                      placeholder='Exercício secundário… ex: "cadeirinha"'
+                      value={secSearch}
+                      onChange={(e) => setSecSearch(e.target.value)}
+                      className="h-8"
+                    />
+                  </div>
+                  <div className="max-h-40 overflow-y-auto">
+                    {filteredSecClasses.map((c) => (
+                      <button
+                        key={c.classId}
+                        type="button"
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-accent"
+                        onClick={() => { onAddSecondary(blockIndex, c); setShowSecPicker(false); setSecSearch('') }}
+                      >
+                        {c.className}
+                      </button>
+                    ))}
+                    {filteredSecClasses.length === 0 && (
+                      <p className="px-3 py-2 text-sm text-muted-foreground">Nenhuma classe encontrada.</p>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </CardContent>
@@ -388,9 +571,12 @@ export default function RoutineForm({ routineId, allExercises, initialData }: Pr
   const [targetSessions, setTargetSessions] = useState<string>('')
 
   // Track which routine_exercise IDs existed at load time so we can soft-delete removed ones
+  // (includes both main and paired secondary rows of bi-sets)
   const initialSetIds = useRef<Set<string>>(
     new Set(
-      initialData?.blocks.flatMap((b) => b.setRows.map((r) => r.id).filter(Boolean) as string[]) ?? []
+      initialData?.blocks.flatMap((b) =>
+        b.setRows.flatMap((r) => [r.id, r.secondaryId].filter(Boolean) as string[])
+      ) ?? []
     )
   )
 
@@ -427,16 +613,23 @@ export default function RoutineForm({ routineId, allExercises, initialData }: Pr
 
   function handleModeChange(circuit: boolean) {
     if (circuit && !isCircuit) {
-      // Switching Padrão → Circuito: collapse each block to `rounds` uniform rows
+      // Bi-sets aren't supported in circuit mode — drop them on conversion
+      if (blocks.some((b) => b.secondary)) {
+        toast.info('Bi-sets não são suportados no modo Circuito e foram removidos.')
+      }
+      // Switching Padrão → Circuito: collapse each block to `rounds` uniform rows.
+      // Secondary (bi-set) fields are dropped so their DB rows get soft-deleted on save.
       setBlocks((prev) => prev.map((b) => {
         const first = b.setRows[0]
         return {
           ...b,
-          setRows: Array.from({ length: rounds }, (_, i) =>
-            i === 0
-              ? first ?? { draftId: crypto.randomUUID(), exerciseId: '', variantLabel: '' }
-              : { draftId: crypto.randomUUID(), exerciseId: first?.exerciseId ?? '', variantLabel: first?.variantLabel ?? '' }
-          ),
+          secondary: undefined,
+          setRows: Array.from({ length: rounds }, (_, i) => ({
+            draftId: i === 0 && first ? first.draftId : crypto.randomUUID(),
+            id: i === 0 ? first?.id : undefined,
+            exerciseId: first?.exerciseId ?? '',
+            variantLabel: first?.variantLabel ?? '',
+          })),
         }
       }))
     }
@@ -521,6 +714,63 @@ export default function RoutineForm({ routineId, allExercises, initialData }: Pr
     }))
   }
 
+  function changeSecondaryVariant(blockIndex: number, setIndex: number, exerciseId: string, variantLabel: string) {
+    setBlocks((prev) => prev.map((b, bi) => {
+      if (bi !== blockIndex) return b
+      return {
+        ...b,
+        setRows: b.setRows.map((r, si) =>
+          si === setIndex ? { ...r, secondaryExerciseId: exerciseId, secondaryVariantLabel: variantLabel } : r
+        ),
+      }
+    }))
+  }
+
+  function addSecondary(blockIndex: number, classInfo: { classId: string; className: string; isTimed: boolean }) {
+    setBlocks((prev) => prev.map((b, i) =>
+      i === blockIndex
+        ? {
+            ...b,
+            secondary: {
+              classId: classInfo.classId,
+              className: classInfo.className,
+              isTimed: classInfo.isTimed,
+              targetReps: 10,
+              targetSeconds: classInfo.isTimed ? 30 : null,
+            },
+            // reset per-set secondary variants for the new class
+            setRows: b.setRows.map((r) => ({ ...r, secondaryExerciseId: '', secondaryVariantLabel: '' })),
+          }
+        : b
+    ))
+  }
+
+  function removeSecondary(blockIndex: number) {
+    // Drop secondary fields so their DB rows land in deletedIds and get soft-deleted
+    setBlocks((prev) => prev.map((b, i) =>
+      i === blockIndex
+        ? {
+            ...b,
+            secondary: undefined,
+            setRows: b.setRows.map((r) => ({
+              ...r,
+              secondaryId: undefined,
+              secondaryExerciseId: undefined,
+              secondaryVariantLabel: undefined,
+            })),
+          }
+        : b
+    ))
+  }
+
+  function updateSecondaryConfig(blockIndex: number, field: 'targetReps' | 'targetSeconds', value: number | null) {
+    setBlocks((prev) => prev.map((b, i) =>
+      i === blockIndex && b.secondary
+        ? { ...b, secondary: { ...b.secondary, [field]: value } }
+        : b
+    ))
+  }
+
   function addSet(blockIndex: number) {
     setBlocks((prev) => prev.map((b, i) => {
       if (i !== blockIndex) return b
@@ -533,6 +783,12 @@ export default function RoutineForm({ routineId, allExercises, initialData }: Pr
             draftId: crypto.randomUUID(),
             exerciseId: last?.exerciseId ?? b.setRows[0]?.exerciseId ?? '',
             variantLabel: last?.variantLabel ?? b.setRows[0]?.variantLabel ?? '',
+            ...(b.secondary
+              ? {
+                  secondaryExerciseId: last?.secondaryExerciseId ?? b.setRows[0]?.secondaryExerciseId ?? '',
+                  secondaryVariantLabel: last?.secondaryVariantLabel ?? b.setRows[0]?.secondaryVariantLabel ?? '',
+                }
+              : {}),
           },
         ],
       }
@@ -575,7 +831,9 @@ export default function RoutineForm({ routineId, allExercises, initialData }: Pr
 
   async function save() {
     if (!name.trim()) return
-    const hasUnselected = blocks.some((b) => b.setRows.some((r) => !r.exerciseId))
+    const hasUnselected = blocks.some((b) =>
+      b.setRows.some((r) => !r.exerciseId || (b.secondary && !r.secondaryExerciseId))
+    )
     if (hasUnselected) {
       toast.error('Selecione um exercício para cada série antes de salvar.')
       return
@@ -604,8 +862,9 @@ export default function RoutineForm({ routineId, allExercises, initialData }: Pr
     }
 
     // Collect all current routine_exercise IDs still present in the form
+    // (both main and paired secondary rows of bi-sets)
     const keptIds = new Set(
-      blocks.flatMap((b) => b.setRows.map((r) => r.id).filter(Boolean) as string[])
+      blocks.flatMap((b) => b.setRows.flatMap((r) => [r.id, r.secondaryId].filter(Boolean) as string[]))
     )
     const deletedIds = [...initialSetIds.current].filter((id) => !keptIds.has(id))
 
@@ -617,51 +876,69 @@ export default function RoutineForm({ routineId, allExercises, initialData }: Pr
       if (error) { toast.error('Não foi possível salvar os exercícios.'); setSaving(false); return }
     }
 
-    // Build the flat list of set rows to upsert/insert
+    // Build the flat list of routine_exercise rows to upsert/insert.
+    // Each set produces one main row (superset_position 0) and, for bi-sets,
+    // one paired secondary row (superset_position 1) sharing the same block_id.
+    type Row = { id?: string; payload: Record<string, unknown> }
+    const rows: Row[] = []
     for (const block of blocks) {
       // For new blocks (no blockId) we generate a stable block_id now
       const blockId = block.blockId ?? crypto.randomUUID()
 
-      const existingRows = block.setRows.filter((r) => r.id)
-      const newRows = block.setRows.filter((r) => !r.id)
-
-      if (existingRows.length > 0) {
-        const { error } = await supabase.from('routine_exercises').upsert(
-          existingRows.map((r) => ({
-            id: r.id!,
+      block.setRows.forEach((r, idx) => {
+        const setNumber = idx + 1
+        rows.push({
+          id: r.id,
+          payload: {
             routine_id: rid!,
             exercise_id: r.exerciseId,
             exercise_class_id: block.classId,
             block_id: blockId,
-            set_number: block.setRows.indexOf(r) + 1,
+            set_number: setNumber,
+            superset_position: 0,
             sets: block.setRows.length,
             target_reps: block.targetReps,
             target_seconds: block.targetSeconds ?? null,
             rest_seconds: block.restSeconds ?? null,
             display_order: block.displayOrder,
-            deleted_at: null,
-          }))
-        )
-        if (error) { toast.error('Não foi possível salvar os exercícios.'); setSaving(false); return }
-      }
+          },
+        })
+        if (block.secondary) {
+          rows.push({
+            id: r.secondaryId,
+            payload: {
+              routine_id: rid!,
+              exercise_id: r.secondaryExerciseId!,
+              exercise_class_id: block.secondary.classId,
+              block_id: blockId,
+              set_number: setNumber,
+              superset_position: 1,
+              sets: block.setRows.length,
+              target_reps: block.secondary.targetReps,
+              target_seconds: block.secondary.targetSeconds ?? null,
+              rest_seconds: block.restSeconds ?? null,
+              display_order: block.displayOrder,
+            },
+          })
+        }
+      })
+    }
 
-      if (newRows.length > 0) {
-        const { error } = await supabase.from('routine_exercises').insert(
-          newRows.map((r) => ({
-            routine_id: rid!,
-            exercise_id: r.exerciseId,
-            exercise_class_id: block.classId,
-            block_id: blockId,
-            set_number: block.setRows.indexOf(r) + 1,
-            sets: block.setRows.length,
-            target_reps: block.targetReps,
-            target_seconds: block.targetSeconds ?? null,
-            rest_seconds: block.restSeconds ?? null,
-            display_order: block.displayOrder,
-          }))
-        )
-        if (error) { toast.error('Não foi possível salvar os exercícios.'); setSaving(false); return }
-      }
+    const existingRows = rows.filter((r) => r.id)
+    const newRows = rows.filter((r) => !r.id)
+
+    if (existingRows.length > 0) {
+      const { error } = await supabase.from('routine_exercises').upsert(
+        existingRows.map((r) => ({ id: r.id!, ...r.payload, deleted_at: null }))
+      )
+      if (error) { toast.error('Não foi possível salvar os exercícios.'); setSaving(false); return }
+    }
+
+    if (newRows.length > 0) {
+      const { error } = await supabase.from('routine_exercises').insert(
+        newRows.map((r) => r.payload)
+      )
+      if (error) { toast.error('Não foi possível salvar os exercícios.'); setSaving(false); return }
     }
 
     router.push('/routines')
@@ -829,10 +1106,15 @@ export default function RoutineForm({ routineId, allExercises, initialData }: Pr
                   block={block}
                   blockIndex={i}
                   variantsByClass={variantsByClass}
+                  allClasses={allClasses}
                   sensors={sensors}
                   isCircuit={isCircuit}
                   onUpdateConfig={updateConfig}
+                  onUpdateSecondaryConfig={updateSecondaryConfig}
                   onChangeVariant={changeVariant}
+                  onChangeSecondaryVariant={changeSecondaryVariant}
+                  onAddSecondary={addSecondary}
+                  onRemoveSecondary={removeSecondary}
                   onAddSet={addSet}
                   onRemoveSet={removeSet}
                   onRemoveBlock={removeBlock}

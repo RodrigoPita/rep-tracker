@@ -53,6 +53,7 @@ export default function HomeClient({ routines, activeSessions, periods, sessionC
       .not('set_number', 'is', null)
       .order('display_order')
       .order('set_number')
+      .order('superset_position')
 
     if (reError) {
       await supabase.from('workout_sessions').delete().eq('id', data.id)

@@ -53,6 +53,8 @@ export type RoutineExercise = {
   set_number: number | null
   block_id: string | null
   exercise_class_id: string | null
+  // bi-set: 0 = main exercise, 1 = secondary (paired, no rest between)
+  superset_position: number
 }
 
 export type WorkoutSession = {

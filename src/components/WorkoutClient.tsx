@@ -303,13 +303,24 @@ export default function WorkoutClient({ session, initialSets }: Props) {
         }
       }
     } else {
+      const pos = (s: WorkoutSetWithExercise) => s.routine_exercises?.superset_position ?? 0
+      const blockKey = set.routine_exercises?.block_id ?? set.routine_exercise_id
+      const setsInBlock = sets.filter((s) => (s.routine_exercises?.block_id ?? s.routine_exercise_id) === blockKey)
+
+      // Bi-set: the main set (position 0) is followed immediately by the secondary
+      // (position 1) with no rest. Rest only fires after the last position of the pair.
+      const maxPosInPair = Math.max(...setsInBlock.filter((s) => s.set_number === set.set_number).map(pos))
+      const isLastOfPair = pos(set) === maxPosInPair
+
+      // Last set overall = last position of the last pair of the last block
       const maxOrder = Math.max(...sets.map((s) => s.routine_exercises.display_order))
-      const lastExerciseSets = sets.filter((s) => s.routine_exercises.display_order === maxOrder)
-      const lastSetNumber = Math.max(...lastExerciseSets.map((s) => s.set_number))
-      const isLastSetOverall = lastExerciseSets.find((s) => s.set_number === lastSetNumber)?.id === setId
-      if (!isLastSetOverall) {
-        const blockKey = set.routine_exercises?.block_id ?? set.routine_exercise_id
-        const setsInBlock = sets.filter((s) => (s.routine_exercises?.block_id ?? s.routine_exercise_id) === blockKey)
+      const lastBlockSets = sets.filter((s) => s.routine_exercises.display_order === maxOrder)
+      const lastSetNumber = Math.max(...lastBlockSets.map((s) => s.set_number))
+      const lastPairSets = lastBlockSets.filter((s) => s.set_number === lastSetNumber)
+      const lastPos = Math.max(...lastPairSets.map(pos))
+      const isLastSetOverall = lastPairSets.find((s) => pos(s) === lastPos)?.id === setId
+
+      if (isLastOfPair && !isLastSetOverall) {
         const maxSetInBlock = Math.max(...setsInBlock.map((s) => s.set_number))
         const isLastSetOfBlock = set.set_number === maxSetInBlock
         const restSecs = isLastSetOfBlock
@@ -351,18 +362,24 @@ export default function WorkoutClient({ session, initialSets }: Props) {
           .sort((a, b) => a.set_number - b.set_number || a.routine_exercises.display_order - b.routine_exercises.display_order)[0] ??
         null
     } else {
-      // Standard: next set of same block → first incomplete set of next block
+      // Standard: next incomplete set in same block by (set_number, position) →
+      // first incomplete set of next block. Handles bi-set pairs correctly.
+      const pos = (s: WorkoutSetWithExercise) => s.routine_exercises?.superset_position ?? 0
+      const rank = (s: WorkoutSetWithExercise) => s.set_number * 1000 + pos(s)
+      const afterBlock = afterSet.routine_exercises?.block_id ?? afterSet.routine_exercise_id
+      const afterRank = rank(afterSet)
       nextSet =
-        sets.find(
-          (s) =>
-            (s.routine_exercises?.block_id ?? s.routine_exercise_id) ===
-              (afterSet.routine_exercises?.block_id ?? afterSet.routine_exercise_id) &&
-            s.set_number === afterSet.set_number + 1 &&
-            !s.completed,
-        ) ??
+        sets
+          .filter(
+            (s) =>
+              (s.routine_exercises?.block_id ?? s.routine_exercise_id) === afterBlock &&
+              !s.completed &&
+              rank(s) > afterRank,
+          )
+          .sort((a, b) => rank(a) - rank(b))[0] ??
         sets
           .filter((s) => s.routine_exercises.display_order > afterSet.routine_exercises.display_order && !s.completed)
-          .sort((a, b) => a.routine_exercises.display_order - b.routine_exercises.display_order || a.set_number - b.set_number)[0] ??
+          .sort((a, b) => a.routine_exercises.display_order - b.routine_exercises.display_order || rank(a) - rank(b))[0] ??
         null
     }
 
@@ -461,9 +478,17 @@ export default function WorkoutClient({ session, initialSets }: Props) {
     return acc
   }, {})
 
-  const exerciseGroups = Object.values(grouped).sort(
-    (a, b) => a[0].routine_exercises.display_order - b[0].routine_exercises.display_order
-  )
+  // Within a block, order by (set_number, superset_position) so bi-set pairs
+  // read main → secondary; blocks themselves ordered by display_order.
+  const exerciseGroups = Object.values(grouped)
+    .map((g) =>
+      [...g].sort(
+        (a, b) =>
+          a.set_number - b.set_number ||
+          (a.routine_exercises?.superset_position ?? 0) - (b.routine_exercises?.superset_position ?? 0)
+      )
+    )
+    .sort((a, b) => a[0].routine_exercises.display_order - b[0].routine_exercises.display_order)
   const totalExercises = exerciseGroups.length
   const totalPlannedSets = sets.length
 
@@ -512,9 +537,12 @@ export default function WorkoutClient({ session, initialSets }: Props) {
         {exerciseGroups.length > 0 && (() => {
           const classMap = new Map<string, WorkoutSetWithExercise[]>()
           for (const group of exerciseGroups) {
-            const name = group[0].routine_exercises.exercises.exercise_classes.name
-            if (!classMap.has(name)) classMap.set(name, [])
-            classMap.get(name)!.push(...group)
+            // Key by each set's own class so a bi-set's secondary gets its own chip
+            for (const s of group) {
+              const name = s.routine_exercises.exercises.exercise_classes.name
+              if (!classMap.has(name)) classMap.set(name, [])
+              classMap.get(name)!.push(s)
+            }
           }
           return (
             <div className="flex flex-wrap gap-2">
@@ -725,6 +753,8 @@ export default function WorkoutClient({ session, initialSets }: Props) {
             const blockKey = exerciseSets[0].routine_exercises?.block_id ?? exerciseSets[0].routine_exercise_id ?? 'unknown'
             // Header shows the class name; each set row shows its own variant
             const className = exercise.exercise_classes.name
+            // Bi-set: block has paired secondary rows (superset_position 1)
+            const isBiset = exerciseSets.some((s) => (s.routine_exercises?.superset_position ?? 0) === 1)
 
             return (
               <div
@@ -757,6 +787,8 @@ export default function WorkoutClient({ session, initialSets }: Props) {
                     const prevIncomplete = exerciseSets.slice(0, setIndex).some(s => !s.completed)
                     const isBlocked = !set.completed && !isActive && (hasActiveSet || prevIncomplete)
                     const variant = set.routine_exercises.exercises.variant
+                    const isSecondary = (set.routine_exercises?.superset_position ?? 0) === 1
+                    const rowClassName = set.routine_exercises.exercises.exercise_classes.name
 
                     const handleRowAction = () => {
                       if (isBlocked || set.completed) return
@@ -793,9 +825,19 @@ export default function WorkoutClient({ session, initialSets }: Props) {
                             )}
                           </button>
 
-                          <span className={['text-sm font-medium flex-shrink-0 max-w-[120px] truncate', set.completed ? 'text-muted-foreground' : ''].join(' ')}>
-                            {variant}
-                          </span>
+                          {isBiset ? (
+                            <div className="flex items-center gap-1.5 flex-shrink-0 max-w-[150px] min-w-0">
+                              {isSecondary && <span className="text-sm font-semibold text-muted-foreground shrink-0">+</span>}
+                              <div className="min-w-0">
+                                <p className="text-[10px] uppercase tracking-wide text-muted-foreground truncate leading-tight">{rowClassName}</p>
+                                <p className={['text-sm font-medium truncate leading-tight', set.completed ? 'text-muted-foreground' : ''].join(' ')}>{variant}</p>
+                              </div>
+                            </div>
+                          ) : (
+                            <span className={['text-sm font-medium flex-shrink-0 max-w-[120px] truncate', set.completed ? 'text-muted-foreground' : ''].join(' ')}>
+                              {variant}
+                            </span>
+                          )}
 
                           {weightExpanded[blockKey] && (
                             <>
