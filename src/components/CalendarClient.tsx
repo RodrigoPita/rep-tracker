@@ -204,9 +204,21 @@ function SessionDetail({ session }: { session: CalendarSession }) {
 
   const trackedSets = session.workout_sets.filter((s): s is TrackedSet => s.routine_exercises != null)
 
-  // Group by class name, preserving first-appearance order (sorted by display_order)
+  // Bi-set secondaries (superset_position 1) are shown nested under their paired
+  // main block, keyed by block_id — not as their own top-level class group.
+  const secondaryByBlock = new Map<string, TrackedSet[]>()
+  for (const set of trackedSets) {
+    if ((set.routine_exercises.superset_position ?? 0) === 1) {
+      const key = set.routine_exercises.block_id ?? set.routine_exercise_id ?? 'unknown'
+      if (!secondaryByBlock.has(key)) secondaryByBlock.set(key, [])
+      secondaryByBlock.get(key)!.push(set)
+    }
+  }
+
+  // Group main sets (position 0) by class name, preserving first-appearance order
   const classMap = new Map<string, TrackedSet[]>()
   for (const set of trackedSets) {
+    if ((set.routine_exercises.superset_position ?? 0) !== 0) continue
     const name = set.routine_exercises.exercises.exercise_classes.name
     if (!classMap.has(name)) classMap.set(name, [])
     classMap.get(name)!.push(set)
@@ -281,10 +293,25 @@ function SessionDetail({ session }: { session: CalendarSession }) {
                     {blocks.map((blockSets, i) => {
                       const variants = [...new Set(blockSets.map(s => s.routine_exercises.exercises.variant).filter(Boolean))]
                       const variantLabel = variants.length > 0 ? variants.join(' / ') : className
+                      const blockId = blockSets[0].routine_exercises.block_id ?? blockSets[0].routine_exercise_id ?? 'unknown'
+                      const secSets = secondaryByBlock.get(blockId)
                       return (
-                        <div key={i} className="flex items-baseline justify-between gap-3 text-sm py-0.5">
-                          <span className="text-muted-foreground truncate">{variantLabel}</span>
-                          <span className="text-muted-foreground/80 text-right shrink-0">{blockDetailSummary(blockSets)}</span>
+                        <div key={i}>
+                          <div className="flex items-baseline justify-between gap-3 text-sm py-0.5">
+                            <span className="text-muted-foreground truncate">{variantLabel}</span>
+                            <span className="text-muted-foreground/80 text-right shrink-0">{blockDetailSummary(blockSets)}</span>
+                          </div>
+                          {secSets && secSets.length > 0 && (() => {
+                            const secClass = secSets[0].routine_exercises.exercises.exercise_classes.name
+                            const secVariants = [...new Set(secSets.map(s => s.routine_exercises.exercises.variant).filter(Boolean))]
+                            const secLabel = secVariants.length > 0 ? secVariants.join(' / ') : secClass
+                            return (
+                              <div className="flex items-baseline justify-between gap-3 text-xs py-0.5 pl-3 text-muted-foreground/70">
+                                <span className="truncate">+ {secClass} — {secLabel}</span>
+                                <span className="text-right shrink-0">{blockDetailSummary(secSets)}</span>
+                              </div>
+                            )
+                          })()}
                         </div>
                       )
                     })}
