@@ -237,7 +237,7 @@
 | 35 | Workout — stable exercise block ordering | ✅ Done | High | Low |
 | 36 | Service layer refactor | ⏳ Pending | Medium | Medium |
 | 37 | Bi-sets | ✅ Done | High | High |
-| 38 | Routine session tables + CSV export | ⏳ Pending | Medium | Medium |
+| 38 | Routine session tables + CSV export | ✅ Done | Medium | Medium |
 
 ---
 
@@ -468,3 +468,16 @@ A per-routine tabular view of recorded training data, with one **table block per
 
 **Notes**
 - Reuse existing helpers (`exerciseLabel`, duration formatting) and keep tables responsive (horizontal scroll on narrow viewports).
+
+**As built** (`/routines/tables` page, `RoutineTablesClient`) — a **session-comparison grid** per routine
+
+Purpose: compare a routine's sessions at a glance to spot progression (chosen over a per-session dump, which the calendar already covers, and over per-set/tidy layouts which were too dense to read). Two earlier attempts were dropped: wide block-columns with grouped sub-headers (dense + bad CSV), and a tidy one-row-per-set list (a data wall).
+
+- **Rows = exercises, columns = sessions (newest first).** The exercise-label column is sticky; session columns scroll horizontally. A bi-set's secondary is its own row, indented with `+`.
+- Each cell is a compact per-session summary: uniform sets → `3×13` / `3×62s`; varied → count × range `6×47–48s` / `3×8–10`; weight appended when present (`· 20kg` / `· 20–25kg`).
+- Footer rows per session: **Séries** (total sets), **Volume** (when weighted), **Duração**.
+- CSV export per routine is **flat long format** (one row per set: `Data, Exercício, Variante, Série, Reps, Carga (kg), Duração (s)`), BOM + escaping, raw seconds — opens clean in Excel/Sheets/pandas.
+- Duration: rep-based sets = elapsed `started_at`→`completed_at`; timed = hold seconds (`actual_reps`). Session duration = first start → last completion. No schema changes.
+- Nested under Treinos: "Tabelas" button on `/routines` (no standalone nav tab, to keep the mobile bottom nav uncrowded); route at `/routines/tables` so the Treinos tab stays active, with a back link.
+
+**Future idea (not built):** a more *visual* history — cards or trend charts per session/exercise — to browse/enjoy rather than compare in a grid. Worth exploring as a follow-up.
