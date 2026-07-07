@@ -470,8 +470,9 @@ A per-routine tabular view of recorded training data, with one **table block per
 - Reuse existing helpers (`exerciseLabel`, duration formatting) and keep tables responsive (horizontal scroll on narrow viewports).
 
 **As built** (`/routines/tables` page, `RoutineTablesClient`)
-- Columns are the **exercise blocks** (column groups) with sub-columns **Var / Reps / kg / Tempo** — Reps omitted for timed classes, kg shown only for blocks that have logged weight. A bi-set's main + secondary become two adjacent column groups (column key = `block_id:superset_position`).
-- Global **Compacto ⇄ Detalhado** toggle: Compacto = one row per session with per-set values joined (`10 / 8 / 8`); Detalhado = one row per set (session date row-spanned). Plus a **Totais** table per routine (séries, reps, volume when weighted, tempo, + session duration).
-- Each table exports its own CSV (BOM + escaping); filenames `<treino>-series-YYYY-MM-DD.csv` / `<treino>-totais-…`.
-- Duration: rep-based sets = elapsed `started_at`→`completed_at`; timed sets = the hold seconds (`actual_reps`). Session duration = first start → last completion. Sticky Data column; archived routines shown with a badge. No schema changes.
+- Two flat tables per routine (the earlier wide block-columns + Compacto/Detalhado design was dropped — too dense to read and its grouped headers didn't flatten to CSV):
+  - **Séries** — a tidy list, one row per set: `Data · Exercício · Variante · Sé · Reps · [Carga] · Tempo`. Sets ordered by block → set number → main/secondary, so bi-sets read naturally as interleaved rows (Agachamento S1, Cadeirinha S1, …). The Data cell is row-spanned per session with a divider between sessions. Reps blank for timed classes; Carga column shown only when the routine has logged weight.
+  - **Totais** — one row per session: `Data · Séries · Reps · [Volume] · Duração`.
+- CSV export per table uses **flat long format** (single header row, one row per set / per session), BOM + escaping, raw seconds for durations — opens clean in Excel/Sheets/pandas. Filenames `<treino>-series-YYYY-MM-DD.csv` / `<treino>-totais-…`.
+- Duration: rep-based sets = elapsed `started_at`→`completed_at`; timed sets = the hold seconds (`actual_reps`). Session duration = first start → last completion. No schema changes.
 - Nested under Treinos: reached via a "Tabelas" button on the `/routines` page (no standalone nav tab, to avoid crowding the mobile bottom nav); the route lives at `/routines/tables` so the Treinos tab stays highlighted, with a back link to `/routines`.

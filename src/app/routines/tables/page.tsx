@@ -1,8 +1,7 @@
 import { supabaseServer } from '@/lib/supabase-server'
-import RoutineTablesClient, { type RoutineTable, type TableCell } from '@/components/RoutineTablesClient'
+import RoutineTablesClient, { type RoutineTable, type SetEntry } from '@/components/RoutineTablesClient'
 
 type FetchedSet = {
-  id: string
   set_number: number
   actual_reps: number | null
   weight_kg: number | null
@@ -10,7 +9,6 @@ type FetchedSet = {
   completed_at: string | null
   routine_exercise_id: string | null
   routine_exercises: {
-    block_id: string | null
     display_order: number
     superset_position: number | null
     exercises: {
@@ -37,7 +35,7 @@ export default async function TablesPage() {
     db
       .from('workout_sessions')
       .select(
-        'id, routine_id, date, created_at, completed_at, workout_sets(id, set_number, actual_reps, weight_kg, started_at, completed_at, routine_exercise_id, routine_exercises(block_id, display_order, superset_position, exercises(variant, exercise_classes(name, is_timed))))'
+        'id, routine_id, date, created_at, completed_at, workout_sets(set_number, actual_reps, weight_kg, started_at, completed_at, routine_exercise_id, routine_exercises(display_order, superset_position, exercises(variant, exercise_classes(name, is_timed))))'
       )
       .not('completed_at', 'is', null)
       .order('date', { ascending: false })
@@ -47,7 +45,6 @@ export default async function TablesPage() {
   const routines = (routinesData ?? []) as { id: string; name: string; archived_at: string | null }[]
   const sessions = (sessionsData ?? []) as unknown as FetchedSession[]
 
-  // Group completed sessions by routine (query order = date desc → preserved)
   const byRoutine = new Map<string, FetchedSession[]>()
   for (const s of sessions) {
     if (!byRoutine.has(s.routine_id)) byRoutine.set(s.routine_id, [])
@@ -59,55 +56,37 @@ export default async function TablesPage() {
     const rSessions = byRoutine.get(routine.id) ?? []
     if (rSessions.length === 0) continue
 
-    // Column registry across all sessions of this routine.
-    // Column key = block_id:superset_position, so a bi-set's main and secondary
-    // become two adjacent columns.
-    const colMeta = new Map<
-      string,
-      { className: string; isTimed: boolean; hasWeight: boolean; displayOrder: number; supersetPosition: number }
-    >()
+    let hasWeight = false
 
-    const rows = rSessions.map((session) => {
-      const cells: Record<string, TableCell[]> = {}
+    const sessionRows = rSessions.map((session) => {
       let minStart: number | null = null
       let maxEnd: number | null = null
 
+      const ordered: { entry: SetEntry; order: number }[] = []
       for (const set of session.workout_sets) {
         const re = set.routine_exercises
         if (!re || !re.exercises) continue // skip sets whose routine_exercise was hard-deleted
-        const pos = re.superset_position ?? 0
-        const blockId = re.block_id ?? set.routine_exercise_id ?? 'unknown'
-        const key = `${blockId}:${pos}`
         const isTimed = re.exercises.exercise_classes.is_timed
         const durationSec = isTimed
           ? set.actual_reps
           : set.started_at && set.completed_at
             ? Math.max(0, Math.round((new Date(set.completed_at).getTime() - new Date(set.started_at).getTime()) / 1000))
             : null
+        if (set.weight_kg != null) hasWeight = true
 
-        const cell: TableCell = {
-          setNumber: set.set_number,
-          variant: re.exercises.variant,
-          reps: isTimed ? null : set.actual_reps,
-          weightKg: set.weight_kg,
-          durationSec,
-          isTimed,
-        }
-        if (!cells[key]) cells[key] = []
-        cells[key].push(cell)
-
-        const meta = colMeta.get(key)
-        if (!meta) {
-          colMeta.set(key, {
+        ordered.push({
+          entry: {
             className: re.exercises.exercise_classes.name,
+            variant: re.exercises.variant,
+            setNumber: set.set_number,
+            reps: isTimed ? null : set.actual_reps,
+            weightKg: set.weight_kg,
+            durationSec,
             isTimed,
-            hasWeight: set.weight_kg != null,
-            displayOrder: re.display_order,
-            supersetPosition: pos,
-          })
-        } else if (set.weight_kg != null) {
-          meta.hasWeight = true
-        }
+          },
+          // sort key: block order → set number → main before secondary
+          order: (re.display_order ?? 0) * 10000 + set.set_number * 10 + (re.superset_position ?? 0),
+        })
 
         if (set.started_at) {
           const t = new Date(set.started_at).getTime()
@@ -119,29 +98,24 @@ export default async function TablesPage() {
         }
       }
 
-      for (const k in cells) cells[k].sort((a, b) => a.setNumber - b.setNumber)
-
+      ordered.sort((a, b) => a.order - b.order)
       const durationSec =
         minStart !== null && maxEnd !== null && maxEnd > minStart ? Math.round((maxEnd - minStart) / 1000) : null
 
-      return { sessionId: session.id, date: session.date, durationSec, cells }
+      return {
+        sessionId: session.id,
+        date: session.date,
+        durationSec,
+        sets: ordered.map((o) => o.entry),
+      }
     })
-
-    const columns = [...colMeta.entries()]
-      .sort(
-        (a, b) =>
-          a[1].displayOrder - b[1].displayOrder ||
-          a[1].supersetPosition - b[1].supersetPosition ||
-          a[1].className.localeCompare(b[1].className)
-      )
-      .map(([key, m]) => ({ key, className: m.className, isTimed: m.isTimed, hasWeight: m.hasWeight }))
 
     tables.push({
       routineId: routine.id,
       name: routine.name,
       archived: routine.archived_at != null,
-      columns,
-      rows,
+      hasWeight,
+      sessions: sessionRows,
     })
   }
 
