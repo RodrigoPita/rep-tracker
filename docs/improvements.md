@@ -237,7 +237,7 @@
 | 35 | Workout — stable exercise block ordering | ✅ Done | High | Low |
 | 36 | Service layer refactor | ⏳ Pending | Medium | Medium |
 | 37 | Bi-sets | ✅ Done | High | High |
-| 38 | Routine session tables + CSV export | ⏳ Pending | Medium | Medium |
+| 38 | Routine session tables + CSV export | ✅ Done | Medium | Medium |
 
 ---
 
@@ -468,3 +468,10 @@ A per-routine tabular view of recorded training data, with one **table block per
 
 **Notes**
 - Reuse existing helpers (`exerciseLabel`, duration formatting) and keep tables responsive (horizontal scroll on narrow viewports).
+
+**As built** (`/routines/tables` page, `RoutineTablesClient`)
+- Columns are the **exercise blocks** (column groups) with sub-columns **Var / Reps / kg / Tempo** — Reps omitted for timed classes, kg shown only for blocks that have logged weight. A bi-set's main + secondary become two adjacent column groups (column key = `block_id:superset_position`).
+- Global **Compacto ⇄ Detalhado** toggle: Compacto = one row per session with per-set values joined (`10 / 8 / 8`); Detalhado = one row per set (session date row-spanned). Plus a **Totais** table per routine (séries, reps, volume when weighted, tempo, + session duration).
+- Each table exports its own CSV (BOM + escaping); filenames `<treino>-series-YYYY-MM-DD.csv` / `<treino>-totais-…`.
+- Duration: rep-based sets = elapsed `started_at`→`completed_at`; timed sets = the hold seconds (`actual_reps`). Session duration = first start → last completion. Sticky Data column; archived routines shown with a badge. No schema changes.
+- Nested under Treinos: reached via a "Tabelas" button on the `/routines` page (no standalone nav tab, to avoid crowding the mobile bottom nav); the route lives at `/routines/tables` so the Treinos tab stays highlighted, with a back link to `/routines`.

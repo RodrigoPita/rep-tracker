@@ -7,7 +7,7 @@ import { supabase } from '@/lib/supabase'
 import type { Routine } from '@/lib/types'
 import { routineMode } from '@/lib/types'
 import { Button } from '@/components/ui/button'
-import { Pencil, Archive, RotateCcw, ChevronDown, Plus } from 'lucide-react'
+import { Pencil, Archive, RotateCcw, ChevronDown, Plus, Table2 } from 'lucide-react'
 
 type Props = {
   routines: Routine[]
@@ -51,10 +51,16 @@ export default function RoutinesClient({ routines: initial, archivedRoutines: in
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Treinos</h1>
-        <Button size="sm" className="gap-1.5" onClick={() => router.push('/routines/new')}>
-          <Plus className="w-3.5 h-3.5" />
-          Novo treino
-        </Button>
+        <div className="flex items-center gap-2 shrink-0">
+          <Button size="sm" variant="outline" className="gap-1.5" onClick={() => router.push('/routines/tables')}>
+            <Table2 className="w-3.5 h-3.5" />
+            Tabelas
+          </Button>
+          <Button size="sm" className="gap-1.5" onClick={() => router.push('/routines/new')}>
+            <Plus className="w-3.5 h-3.5" />
+            Novo treino
+          </Button>
+        </div>
       </div>
 
       {routines.length === 0 ? (
