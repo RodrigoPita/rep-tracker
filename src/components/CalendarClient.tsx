@@ -199,13 +199,22 @@ function blockSummary(sets: TrackedSet[]): string {
   return reps.join(', ') + ' reps'
 }
 
+// Single-set value, e.g. "20 reps · 10 kg" or "32s"
+function setValue(set: TrackedSet): string {
+  if (!set.completed) return '—'
+  const isTimed = set.routine_exercises.exercises.exercise_classes.is_timed
+  if (isTimed) return set.actual_reps != null ? `${set.actual_reps}s` : '?'
+  const weightSuffix = set.weight_kg != null ? ` · ${set.weight_kg} kg` : ''
+  return `${set.actual_reps ?? '?'} reps${weightSuffix}`
+}
+
 function SessionDetail({ session }: { session: CalendarSession }) {
-  const [expandedClasses, setExpandedClasses] = useState<Set<string>>(new Set())
+  const [expandedBlocks, setExpandedBlocks] = useState<Set<string>>(new Set())
 
   const trackedSets = session.workout_sets.filter((s): s is TrackedSet => s.routine_exercises != null)
 
   // Bi-set secondaries (superset_position 1) are shown nested under their paired
-  // main block, keyed by block_id — not as their own top-level class group.
+  // main block, keyed by block_id — not as their own top-level group.
   const secondaryByBlock = new Map<string, TrackedSet[]>()
   for (const set of trackedSets) {
     if ((set.routine_exercises.superset_position ?? 0) === 1) {
@@ -215,35 +224,47 @@ function SessionDetail({ session }: { session: CalendarSession }) {
     }
   }
 
-  // Group main sets (position 0) by class name, preserving first-appearance order
-  const classMap = new Map<string, TrackedSet[]>()
+  // Group main sets (position 0) by block — each routine block is its own
+  // top-level row, mirroring how the routine was built (legacy sessions
+  // without block_id fall back to routine_exercise_id, one row per exercise)
+  const blockMap = new Map<string, TrackedSet[]>()
   for (const set of trackedSets) {
     if ((set.routine_exercises.superset_position ?? 0) !== 0) continue
-    const name = set.routine_exercises.exercises.exercise_classes.name
-    if (!classMap.has(name)) classMap.set(name, [])
-    classMap.get(name)!.push(set)
+    const key = set.routine_exercises.block_id ?? set.routine_exercise_id ?? 'unknown'
+    if (!blockMap.has(key)) blockMap.set(key, [])
+    blockMap.get(key)!.push(set)
   }
-  const classGroups = [...classMap.entries()].sort(
+  const blocks = [...blockMap.entries()].sort(
     ([, a], [, b]) =>
-      Math.min(...a.map(s => s.routine_exercises.display_order ?? 0)) -
-      Math.min(...b.map(s => s.routine_exercises.display_order ?? 0))
+      (a[0].routine_exercises.display_order ?? 0) - (b[0].routine_exercises.display_order ?? 0)
   )
+
+  // A block is expandable only when there is detail beyond its summary line:
+  // a bi-set secondary, mixed variants, or non-uniform per-set values
+  function isExpandable(blockId: string, blockSets: TrackedSet[]): boolean {
+    if ((secondaryByBlock.get(blockId)?.length ?? 0) > 0) return true
+    const variants = new Set(blockSets.map(s => s.routine_exercises.exercises.variant).filter(Boolean))
+    if (variants.size > 1) return true
+    const completed = blockSets.filter(s => s.completed)
+    if (completed.length < blockSets.length) return true
+    return !completed.every(s => setValue(s) === setValue(completed[0]))
+  }
 
   const completedCount = trackedSets.filter(s => s.completed).length
   const totalCount = trackedSets.length
-  const allClassNames = classGroups.map(([name]) => name)
-  const allExpanded = allClassNames.length > 0 && allClassNames.every(n => expandedClasses.has(n))
+  const expandableIds = blocks.filter(([id, sets]) => isExpandable(id, sets)).map(([id]) => id)
+  const allExpanded = expandableIds.length > 0 && expandableIds.every(id => expandedBlocks.has(id))
 
-  function toggleClass(name: string) {
-    setExpandedClasses(prev => {
+  function toggleBlock(id: string) {
+    setExpandedBlocks(prev => {
       const next = new Set(prev)
-      next.has(name) ? next.delete(name) : next.add(name)
+      next.has(id) ? next.delete(id) : next.add(id)
       return next
     })
   }
 
   function toggleAll() {
-    setExpandedClasses(allExpanded ? new Set() : new Set(allClassNames))
+    setExpandedBlocks(allExpanded ? new Set() : new Set(expandableIds))
   }
 
   return (
@@ -251,70 +272,84 @@ function SessionDetail({ session }: { session: CalendarSession }) {
       <div className="flex items-center justify-between">
         <span className="font-semibold">{session.routines.name}</span>
         <div className="flex items-center gap-3">
-          <button onClick={toggleAll} className="text-muted-foreground hover:text-foreground transition-colors" aria-label={allExpanded ? 'Recolher tudo' : 'Expandir tudo'}>
-            {allExpanded ? <ChevronsDownUp className="w-4 h-4" /> : <ChevronsUpDown className="w-4 h-4" />}
-          </button>
+          {expandableIds.length > 0 && (
+            <button onClick={toggleAll} className="text-muted-foreground hover:text-foreground transition-colors" aria-label={allExpanded ? 'Recolher tudo' : 'Expandir tudo'}>
+              {allExpanded ? <ChevronsDownUp className="w-4 h-4" /> : <ChevronsUpDown className="w-4 h-4" />}
+            </button>
+          )}
           <span className="text-xs text-muted-foreground">{completedCount}/{totalCount} séries</span>
         </div>
       </div>
 
-      {classGroups.length > 0 && (
+      {blocks.length > 0 && (
         <div className="space-y-0.5 border-t border-border pt-3">
-          {classGroups.map(([className, classSets]) => {
-            // Group sets within class by block (block_id ?? routine_exercise_id)
-            const blockMap = new Map<string, TrackedSet[]>()
-            for (const set of classSets) {
-              const key = set.routine_exercises.block_id ?? set.routine_exercise_id ?? 'unknown'
-              if (!blockMap.has(key)) blockMap.set(key, [])
-              blockMap.get(key)!.push(set)
-            }
-            const blocks = [...blockMap.values()].sort(
-              (a, b) => (a[0].routine_exercises.display_order ?? 0) - (b[0].routine_exercises.display_order ?? 0)
+          {blocks.map(([blockId, blockSets]) => {
+            const className = blockSets[0].routine_exercises.exercises.exercise_classes.name
+            const variants = [...new Set(blockSets.map(s => s.routine_exercises.exercises.variant).filter(Boolean))]
+            const mixedVariants = variants.length > 1
+            const secSets = secondaryByBlock.get(blockId)
+            const expandable = expandableIds.includes(blockId)
+            const isExpanded = expandable && expandedBlocks.has(blockId)
+            const orderedSets = [...blockSets].sort((a, b) => a.set_number - b.set_number)
+
+            const headerRow = (
+              <>
+                <span className="truncate">
+                  <span className="font-medium text-foreground">{className}</span>
+                  {variants.length > 0 && (
+                    <span className="text-muted-foreground"> — {variants.join(' / ')}</span>
+                  )}
+                </span>
+                <div className="flex items-center gap-1 shrink-0">
+                  <span className="text-muted-foreground text-right">{blockSummary(blockSets)}</span>
+                  {expandable ? (
+                    <ChevronDown className={['w-3.5 h-3.5 text-muted-foreground/60 transition-transform shrink-0', isExpanded ? 'rotate-180' : ''].join(' ')} />
+                  ) : (
+                    <span className="w-3.5 shrink-0" />
+                  )}
+                </div>
+              </>
             )
 
-            const classSummaryStr = blockSummary(classSets)
-            const isExpanded = expandedClasses.has(className)
-
             return (
-              <div key={className}>
-                <button
-                  onClick={() => toggleClass(className)}
-                  className="w-full flex items-center justify-between gap-3 text-sm py-1.5 group"
-                >
-                  <span className="font-medium text-foreground">{className}</span>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <span className="text-muted-foreground text-right">{classSummaryStr}</span>
-                    <ChevronDown className={['w-3.5 h-3.5 text-muted-foreground/60 transition-transform shrink-0', isExpanded ? 'rotate-180' : ''].join(' ')} />
+              <div key={blockId}>
+                {expandable ? (
+                  <button
+                    onClick={() => toggleBlock(blockId)}
+                    className="w-full flex items-center justify-between gap-3 text-sm py-1.5 group"
+                  >
+                    {headerRow}
+                  </button>
+                ) : (
+                  <div className="w-full flex items-center justify-between gap-3 text-sm py-1.5">
+                    {headerRow}
                   </div>
-                </button>
+                )}
 
                 {isExpanded && (
                   <div className="ml-2 pl-3 border-l border-border space-y-0.5 pb-1">
-                    {blocks.map((blockSets, i) => {
-                      const variants = [...new Set(blockSets.map(s => s.routine_exercises.exercises.variant).filter(Boolean))]
-                      const variantLabel = variants.length > 0 ? variants.join(' / ') : className
-                      const blockId = blockSets[0].routine_exercises.block_id ?? blockSets[0].routine_exercise_id ?? 'unknown'
-                      const secSets = secondaryByBlock.get(blockId)
+                    {orderedSets.map(set => (
+                      <div key={set.id} className="flex items-baseline justify-between gap-3 text-sm py-0.5">
+                        <span className="text-muted-foreground truncate">
+                          Série {set.set_number}
+                          {mixedVariants && set.routine_exercises.exercises.variant && (
+                            <span className="text-muted-foreground/70"> — {set.routine_exercises.exercises.variant}</span>
+                          )}
+                        </span>
+                        <span className="text-muted-foreground/80 text-right shrink-0">{setValue(set)}</span>
+                      </div>
+                    ))}
+                    {secSets && secSets.length > 0 && (() => {
+                      const secClass = secSets[0].routine_exercises.exercises.exercise_classes.name
+                      const secVariants = [...new Set(secSets.map(s => s.routine_exercises.exercises.variant).filter(Boolean))]
+                      const secLabel = secVariants.length > 0 ? secVariants.join(' / ') : secClass
                       return (
-                        <div key={i}>
-                          <div className="flex items-baseline justify-between gap-3 text-sm py-0.5">
-                            <span className="text-muted-foreground truncate">{variantLabel}</span>
-                            <span className="text-muted-foreground/80 text-right shrink-0">{blockDetailSummary(blockSets)}</span>
-                          </div>
-                          {secSets && secSets.length > 0 && (() => {
-                            const secClass = secSets[0].routine_exercises.exercises.exercise_classes.name
-                            const secVariants = [...new Set(secSets.map(s => s.routine_exercises.exercises.variant).filter(Boolean))]
-                            const secLabel = secVariants.length > 0 ? secVariants.join(' / ') : secClass
-                            return (
-                              <div className="flex items-baseline justify-between gap-3 text-xs py-0.5 pl-3 text-muted-foreground/70">
-                                <span className="truncate">+ {secClass} — {secLabel}</span>
-                                <span className="text-right shrink-0">{blockDetailSummary(secSets)}</span>
-                              </div>
-                            )
-                          })()}
+                        <div className="flex items-baseline justify-between gap-3 text-xs py-0.5 text-muted-foreground/70">
+                          <span className="truncate">+ {secClass} — {secLabel}</span>
+                          <span className="text-right shrink-0">{blockDetailSummary(secSets)}</span>
                         </div>
                       )
-                    })}
+                    })()}
                   </div>
                 )}
               </div>
